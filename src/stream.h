@@ -25,6 +25,7 @@
 
 SJR_BEGIN_EXTERN
 
+int  open_stream        (const char *hostname, unsigned int port);
 void parse_stream_block (void *userdata, const char *buf, size_t len);
 
 SJR_END_EXTERN

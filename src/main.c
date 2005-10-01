@@ -30,6 +30,7 @@
 
 #include "live-f1.h"
 #include "http.h"
+#include "stream.h"
 
 
 /* Program name */
@@ -46,6 +47,7 @@ main (int   argc,
 	char         *cookie;
 	unsigned int  key;
 	ne_session   *http_sess;
+	int           sock;
 
 	setlocale (LC_ALL, "");
 	bindtextdomain (PACKAGE, LOCALEDIR);
@@ -77,8 +79,15 @@ main (int   argc,
 
 	ne_session_destroy (http_sess);
 
+
 	http_sess = ne_session_create ("http", "localhost", 80);
 	ne_set_useragent (http_sess, PACKAGE_STRING);
+
+	sock = open_stream ("localhost", 4321);
+	if (sock < 0) {
+		printf ("Unable to open data stream.\n");
+		return 1;
+	}
 
 	obtain_key_frame (http_sess, 151, NULL);
 

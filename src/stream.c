@@ -24,9 +24,78 @@
 #endif /* HAVE_CONFIG_H */
 
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+
 #include "live-f1.h"
 #include "stream.h"
 
+
+/**
+ * open_stream:
+ * @hostname: hostname of timing server,
+ * @port: port of timing server.
+ *
+ * Creates a socket for the data stream and connects to the live timing
+ * server so data can be received.
+ *
+ * Returns: connected socket or -1 on failure.
+ **/
+int
+open_stream (const char   *hostname,
+	     unsigned int  port)
+{
+	struct addrinfo *res, hints;
+	static char      service[6];
+	int              sock, ret;
+
+	info (2, _("Looking up %s ...\n"), hostname);
+
+	sprintf (service, "%hu", port);
+
+	memset (&hints, 0, sizeof (hints));
+	hints.ai_socktype = SOCK_STREAM;
+
+	ret = getaddrinfo (hostname, service, &hints, &res);
+	if (ret != 0) {
+		fprintf (stderr, "%s: %s: %s: %s\n", program_name,
+			 _("failed to resolve host"), hostname,
+			 gai_strerror (ret));
+		return -1;
+	}
+
+	info (1, _("Connecting to data stream ...\n"));
+
+	sock = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (sock < 0) {
+		fprintf (stderr, "%s: %s: %s\n", program_name,
+			 _("failed to create data stream socket"),
+			 strerror (errno));
+		goto error;
+	}
+
+	ret = connect (sock, res->ai_addr, res->ai_addrlen);
+	if (ret < 0) {
+		fprintf (stderr, "%s: %s: %s\n", program_name,
+			 _("failed to connect to data stream"),
+			 strerror (errno));
+
+		close (sock);
+		sock = -1;
+	}
+
+	info (3, _("Connected.\n"));
+
+error:
+	freeaddrinfo (res);
+	return sock;
+}
 
 void
 parse_stream_block (void       *userdata,
