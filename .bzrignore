@@ -33,4 +33,5 @@ po/*.sin
 po/*.header
 po/Rules-quot
 po/stamp-po
+po/live-f1.pot
 src/live-f1
