@@ -91,6 +91,9 @@ main (int   argc,
 
 	obtain_key_frame (http_sess, 151, NULL);
 
+	while (read_stream (http_sess, sock) > 0)
+		;
+
 	ne_session_destroy (http_sess);
 
 	return 0;

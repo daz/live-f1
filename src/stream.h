@@ -20,13 +20,17 @@
 #ifndef LIVE_F1_STREAM_H
 #define LIVE_F1_STREAM_H
 
+#include <ne_session.h>
+
 #include "macros.h"
 
 
 SJR_BEGIN_EXTERN
 
 int  open_stream        (const char *hostname, unsigned int port);
-void parse_stream_block (void *userdata, const char *buf, size_t len);
+int  read_stream        (ne_session *http_sess, int sock);
+void parse_stream_block (ne_session *http_sess, const unsigned char *buf,
+			 size_t len);
 
 SJR_END_EXTERN
 

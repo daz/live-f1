@@ -260,7 +260,7 @@ obtain_key_frame (ne_session   *http_sess,
 	req = ne_request_create (http_sess, "GET", url);
 	ne_add_response_body_reader (req, ne_accept_2xx,
 				     (ne_block_reader) parse_stream_block,
-				     userdata);
+				     http_sess);
 	free (url);
 
 	/* Dispatch the event */
@@ -275,5 +275,6 @@ obtain_key_frame (ne_session   *http_sess,
 	info (3, _("Key frame received\n"));
 
 	ne_request_destroy (req);
+	ne_close_connection (http_sess);
 	return 0;
 }

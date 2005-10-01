@@ -1,5 +1,18 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/stream.c (read_stream): Poll the data stream file descriptor
+	and deal with events, if after one second we haven't got any data
+	from it, send it a ping to see whether that wakes it up.
+	(parse_stream_block): Take an http_sess for obtaining key frames
+	when we need to.
+	(open_stream): Iterate the available addresses until we find one
+	that works.
+	* src/stream.h: Update.
+	* src/http.c (obtain_key_frame): Pass our own session to
+	parse_stream_block() in case it needs to get more key frames.
+	Close the connection when done so we don't keep the server
+	hanging.
+
 	* src/stream.c (open_stream): Lookup the hostname in a hopefully
 	protocol-independant manner and connect to the data stream port.
 	* src/stream.h: Update.
