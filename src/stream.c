@@ -39,9 +39,14 @@
 #include "stream.h"
 
 
+/* Encryption seed */
+#define CRYPTO_SEED 0x55555555
+
+
 /* Forward prototypes */
-static int next_packet (unsigned char *packet, size_t *packet_len,
-			const unsigned char **buf, size_t *buf_len);
+static int next_packet (CurrentState *state, unsigned char *packet,
+			size_t *packet_len, const unsigned char **buf,
+			size_t *buf_len);
 
 
 /**
@@ -206,7 +211,7 @@ parse_stream_block (CurrentState        *state,
 	static unsigned char packet[129];
 	static size_t        packet_len = 0;
 
-	while (next_packet (packet, &packet_len, &buf, &buf_len)) {
+	while (next_packet (state, packet, &packet_len, &buf, &buf_len)) {
 		unsigned char copy[129];
 
 		/* Make a copy of the packet on the stack and reset
@@ -225,6 +230,7 @@ parse_stream_block (CurrentState        *state,
 
 /**
  * next_packet:
+ * @state: application state structure,
  * @packet: buffer in which to store the packet,
  * @packet_len: length of packet data already in @packet,
  * @buf: buffer to copy packet from,
@@ -237,12 +243,14 @@ parse_stream_block (CurrentState        *state,
  * Returns: 0 if the packet was not complete, 1 if it is complete
  **/
 static int
-next_packet (unsigned char        *packet,
+next_packet (CurrentState         *state,
+	     unsigned char        *packet,
 	     size_t               *packet_len,
 	     const unsigned char **buf,
 	     size_t               *buf_len)
 {
 	size_t needed, expected;
+	int    decrypt = 0;
 
 	/* We need a minimum of two bytes to figure out how long the rest
 	 * of it's supposed to be; copy those now if we have room.
@@ -266,9 +274,11 @@ next_packet (unsigned char        *packet,
 			break;
 		case CAR_POSITION_HISTORY:
 			expected = LONG_PACKET_LEN (packet);
+			decrypt = 1;
 			break;
 		default:
 			expected = SHORT_PACKET_LEN (packet);
+			decrypt = 1;
 			break;
 		}
 	} else {
@@ -277,20 +287,29 @@ next_packet (unsigned char        *packet,
 		case SYS_UNKNOWN_SPECIAL_B:
 			expected = SPECIAL_PACKET_LEN (packet);
 			break;
+		case SYS_STRANGE_A:
+			expected = 2;
+			decrypt = 1;
+			break;
 		case SYS_EVENT_ID:
 		case SYS_KEY_FRAME:
+			expected = SHORT_PACKET_LEN (packet);
+			decrypt = 0;
+			break;
 		case SYS_UNKNOWN_SHORT_A:
 		case SYS_UNKNOWN_SHORT_B:
 			expected = SHORT_PACKET_LEN (packet);
-			break;
-		case SYS_STRANGE_A:
-			expected = 2;
+			decrypt = 1;
 			break;
 		case SYS_UNKNOWN_LONG_A:
 		case SYS_UNKNOWN_LONG_B:
 		case SYS_UNKNOWN_LONG_C:
+			expected = LONG_PACKET_LEN (packet);
+			decrypt = 1;
+			break;
 		case SYS_COPYRIGHT:
 			expected = LONG_PACKET_LEN (packet);
+			decrypt = 0;
 			break;
 		}
 	}
@@ -304,5 +323,48 @@ next_packet (unsigned char        *packet,
 	*buf += needed;
 	*buf_len -= needed;
 
-	return (*packet_len == expected);
+	if (*packet_len == expected) {
+		if (decrypt)
+			decrypt_bytes (state, packet + 2, (*packet_len) - 2);
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+/**
+ * reset_decryption:
+ * @state: application state structure.
+ *
+ * Resets the encryption salt to the initial seed; this begins the
+ * cycle again.
+ **/
+void
+reset_decryption (CurrentState *state)
+{
+	state->salt = CRYPTO_SEED;
+}
+
+/**
+ * decrypt_bytes:
+ * @state: application state structure,
+ * @buf: buffer to decrypt,
+ * @len: number of bytes in @buf to decrypt.
+ *
+ * Decrypts the initial @len bytes of @buf modifying the buffer given,
+ * rather than returning a new string.
+ **/
+void
+decrypt_bytes (CurrentState  *state,
+	       unsigned char *buf,
+	       size_t         len)
+{
+	if (! state->key)
+		return;
+
+	while (len--) {
+		state->salt = ((state->salt >> 1)
+			       ^ (state->salt & 0x01 ? state->key : 0));
+		*(buf++) ^= (state->salt & 0xff);
+	}
 }

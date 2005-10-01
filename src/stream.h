@@ -30,6 +30,9 @@ int  read_stream        (CurrentState *http_sess, int sock);
 void parse_stream_block (CurrentState *http_sess, const unsigned char *buf,
 			 size_t buf_len);
 
+void reset_decryption   (CurrentState *state);
+void decrypt_bytes      (CurrentState *state, unsigned char *buf, size_t len);
+
 SJR_END_EXTERN
 
 #endif /* LIVE_F1_STREAM_H */

@@ -60,6 +60,7 @@ main (int   argc,
 	}
 
 	memset (&state, 0, sizeof (state));
+	reset_decryption (&state);
 
 	state.cookie = obtain_auth_cookie ("scott-fia@netsplit.com",
 					   "mka773624");

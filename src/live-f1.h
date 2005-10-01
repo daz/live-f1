@@ -45,6 +45,7 @@ typedef enum {
  * CurrentState:
  * @cookie: user's authorisation cookie,
  * @key: decryption key,
+ * @salt: current decryption salt,
  * @frame: last seen key frame,
  * @event_no: event number,
  * @event_type: event type.
@@ -54,7 +55,7 @@ typedef enum {
  **/
 typedef struct {
 	char         *cookie;
-	unsigned int  key;
+	unsigned int  key, salt;
 	unsigned int  frame;
 	unsigned int  event_no;
 	EventType     event_type;

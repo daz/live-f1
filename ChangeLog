@@ -1,5 +1,20 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (CurrentState): Add the decryption salt to the
+	state structure.
+	* src/stream.c (reset_decryption): Add function to reset the
+	decryption salt to the initial seed.
+	(decrypt_bytes): Add the actual decryption algorithm.
+	(next_packet): Record for each event type whether it needs
+	decrypting or not, and decrypt it if it does.
+	* src/stream.h: Update.
+	* src/main.c (main): Set the decryption salt after clearing the
+	state structure.
+	* src/packet.c (handle_system_packet): Reset the decryption salt
+	when receiving a key frame packet and after obtaining the key frame.
+	(handle_system_packet): Reset the decryption salt after changing
+	the key.
+
 	* src/live-f1.h (CurrentState): Remove http session stuff from
 	CurrentState, because we actually can't make multiple requests
 	on the same session so will need a new one each time anyway.
