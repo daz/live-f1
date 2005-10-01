@@ -1,3 +1,85 @@
+Data Stream
+-----------
+
+The primary source of the live timing feed information is the data
+stream itself, available by connecting to live-timing.formula1.com on
+port 4321.
+
+The basic protocol is a little strange, rather than the server sending
+data whenever it has any and relying on TCP to keep the connection
+open, it instead sends bursts of data whenever the client pings it.
+
+  --> (connect)
+  <-- (initial data burst)
+  --> 0x10
+  <-- (further data burst)
+  --> 0x10
+
+We therefore take care to ensure that if more than a second passes
+without any activity on the socket, we send the 0x10 byte to see if we
+get any more data.
+
+So now onto the data format itself, as one might expect from a
+protocol which hasn't seen the love of a Unix hand, it's binary with
+some pretty fun bit mapping going on.
+
+Roughly it's a sequence of packets, each one with a two-byte header
+that identifies the type of packet and how much data is to follow it.
+Unfortunately to my eye it looks like the header started out as a
+16-bit int on the server and got output little-endian down the wire.
+
+This means the header makes more sense if you flip the first two bytes
+around, so for the sake of example, that's what I've done in the
+following illustration.
+
+    _p[1]            _p[0]
+    [ | | | | | | | ][ | | | | | | | ]
+     +-data------+ +-type-+ +-carid-+
+
+Notice that the most significant bit of the type field is the least
+significant bit of the second byte, and that type's three least
+significant bits are the three most significant bits of the first
+byte.
+
+The type of a packet can be uniquely identified by the pairing of the
+type field and carid field, when the carid is 0 the types appear to be
+largely system messages, otherwise when non-zero they are always
+car-related.
+
+The data field varies according to the type of the packet, but can be
+pretty much defined into three categories.
+
+The first are the "special" packets which use the data field as a
+handy place to store 7-bits of data particular to that packet.  These
+packets have no following data in the stream, the next byte will be
+another packet.
+
+The second are the "long" packets, these use the field to store the
+number of bytes that are to follow in the stream and make up the
+payload of the packet.  This implies a maximum size of 127 bytes for
+data, combined with 2 bytes header, making a maxmimum packet size of
+129 bytes.
+
+The third are the "short" packets, these split the field into two
+parts as follows:
+
+    _p[1]            _p[0]
+    [ | | | | | | | ][ | | | | | | | ]
+     +-len-+ +-d-+ +-type-+ +-carid-+
+
+The most significant four bits are used to store the number of bytes
+that are to follow in the stream, unless the length is 0x0f
+(-1 perhaps?) in which case no bytes will follow in the stream.  This
+gives us as a maximum of 14 bytes of data for a short packet, and a
+maximum short packet size of 16 bytes.  The three least significant
+bits of the larger data field are used to store data particular to the
+packet, in particular this is always the "colour" for car packets but
+varies for system packets.
+
+Finally there's an extra bugger of a packet, the system packet with
+type 0x07 which has zero data/length but two bytes following it.
+
+
 Key Frames
 ----------
 

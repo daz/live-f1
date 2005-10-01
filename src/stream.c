@@ -38,6 +38,63 @@
 #include "stream.h"
 
 
+/* Which car the packet is for */
+#define PACKET_CAR(_p) ((_p)[0] & 0x1f)
+
+/* Which type of packet it is */
+#define PACKET_TYPE(_p) (((_p)[0] >> 5) | (((_p)[1] & 0x01) << 3))
+
+/* Data from a short packet */
+#define SHORT_PACKET_DATA(_p) (((_p)[1] & 0x0e) >> 1)
+
+/* Data from a special packet */
+#define SPECIAL_PACKET_DATA(_p) ((_p)[1] >> 1)
+
+/* Length of the packet if it's one of the long ones */
+#define LONG_PACKET_LEN(_p) (SPECIAL_PACKET_DATA(_p) + 2)
+
+/* Flag for a nominally short packet with no following data */
+#define SHORT_PACKET_NUL(_p) (((_p)[1] & 0xf0) == 0xf0)
+
+/* Length of the packet if it's one of the short ones */
+#define SHORT_PACKET_LEN(_p) ((SHORT_PACKET_NUL(_p) ? 0 : ((_p)[1] >> 4)) + 2)
+
+/* Length of the packet if it's a special one */
+#define SPECIAL_PACKET_LEN(_p) 2
+
+
+/* Types of packets for cars */
+typedef enum {
+	CAR_POSITION_UPDATE,
+	CAR_POSITION,
+	CAR_NUMBER,
+	CAR_DRIVER,
+	/* Everything else is short */
+	CAR_POSITION_HISTORY = 15
+} CarPacketType;
+
+/* Types of non-car packets */
+typedef enum {
+	SYS_EVENT_ID = 1,
+	SYS_KEY_FRAME,
+	SYS_UNKNOWN_SPECIAL_A,
+	SYS_UNKNOWN_LONG_A,
+	SYS_UNKNOWN_SPECIAL_B,
+	SYS_UNKNOWN_LONG_B,
+	SYS_STRANGE_A, /* Always two bytes */
+	SYS_UNKNOWN_SPECIAL_C,
+	SYS_UNKNOWN_SHORT_A,
+	SYS_UNKNOWN_LONG_C,
+	SYS_UNKNOWN_SHORT_B,
+	SYS_COPYRIGHT
+} SystemPacketType;
+
+
+/* Forward prototypes */
+static int next_packet (unsigned char *packet, size_t *packet_len,
+			const unsigned char **buf, size_t *buf_len);
+
+
 /**
  * open_stream:
  * @hostname: hostname of timing server,
@@ -183,10 +240,107 @@ error:
 	return -1;
 }
 
+/**
+ * parse_stream_block:
+ * @http_sess: neon http session to use for key frames,
+ * @buf: data read from server or key frame,
+ * @buf_len: length of @buf.
+ *
+ * Parse a data stream block obtained either from the data server or a
+ * key frame.
+ **/
 void
 parse_stream_block (ne_session          *http_sess,
 		    const unsigned char *buf,
-		    size_t               len)
+		    size_t               buf_len)
 {
-	info (3, _("Received %zi bytes\n"), len);
+	static unsigned char packet[129];
+	static size_t        packet_len = 0;
+
+	while (next_packet (packet, &packet_len, &buf, &buf_len)) {
+		/*info (3, _("PACKET! %zi bytes\n"), packet_len); */
+
+		packet_len = 0;
+	}
+}
+
+/**
+ * next_packet:
+ * @packet: buffer in which to store the packet,
+ * @packet_len: length of packet data already in @packet,
+ * @buf: buffer to copy packet from,
+ * @buf_len: length of @buf.
+ *
+ * Copy a packet, or part thereof, from @buf into @packet updating
+ * @packet_len to the new length.  Can be called a byte at a time if
+ * that's how the packet arrives.
+ *
+ * Returns: 0 if the packet was not complete, 1 if it is complete
+ **/
+static int
+next_packet (unsigned char        *packet,
+	     size_t               *packet_len,
+	     const unsigned char **buf,
+	     size_t               *buf_len)
+{
+	size_t needed, expected;
+
+	/* We need a minimum of two bytes to figure out how long the rest
+	 * of it's supposed to be; copy those now if we have room.
+	 */
+	if (*packet_len < 2) {
+		needed = MIN (*buf_len, 2 - *packet_len);
+		memcpy (packet + *packet_len, *buf, needed);
+
+		*packet_len += needed;
+		*buf += needed;
+		*buf_len -= needed;
+		if (*packet_len < 2)
+			return 0;
+	}
+
+	/* We have enough of the packet to know how long it is */
+	if (PACKET_CAR (packet)) {
+		switch ((CarPacketType) PACKET_TYPE (packet)) {
+		case CAR_POSITION_UPDATE:
+			expected = SPECIAL_PACKET_LEN (packet);
+			break;
+		case CAR_POSITION_HISTORY:
+			expected = LONG_PACKET_LEN (packet);
+			break;
+		default:
+			expected = SHORT_PACKET_LEN (packet);
+			break;
+		}
+	} else {
+		switch ((SystemPacketType) PACKET_TYPE (packet)) {
+		case SYS_UNKNOWN_SPECIAL_A:
+		case SYS_UNKNOWN_SPECIAL_B:
+		case SYS_UNKNOWN_SPECIAL_C:
+			expected = SPECIAL_PACKET_LEN (packet);
+			break;
+		case SYS_EVENT_ID:
+		case SYS_KEY_FRAME:
+		case SYS_UNKNOWN_SHORT_A:
+		case SYS_UNKNOWN_SHORT_B:
+			expected = SHORT_PACKET_LEN (packet);
+			break;
+		case SYS_STRANGE_A:
+			expected = 4;
+			break;
+		default:
+			expected = LONG_PACKET_LEN (packet);
+			break;
+		}
+	}
+
+	/* Copy as much as we can */
+	needed = MIN (*buf_len, expected - *packet_len);
+	memcpy (packet + *packet_len, *buf, needed);
+
+	*packet_len += needed;
+	*buf += needed;
+	*buf_len -= needed;
+
+	return (*packet_len == expected);
 }

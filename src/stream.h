@@ -30,7 +30,7 @@ SJR_BEGIN_EXTERN
 int  open_stream        (const char *hostname, unsigned int port);
 int  read_stream        (ne_session *http_sess, int sock);
 void parse_stream_block (ne_session *http_sess, const unsigned char *buf,
-			 size_t len);
+			 size_t buf_len);
 
 SJR_END_EXTERN
 

@@ -1,5 +1,28 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/stream.c (parse_stream_block): Rename len parameter to
+	buf_len to be more clear, iterate over the packets in the buffer
+	using a static array so we can survive packets happening across
+	boundaries.
+	(next_packet): Take the next packet off the buffer and add it to
+	parse_stream_block()s static buffer until we have a full-sized
+	event that can be processed.
+	(PACKET_CAR, PACKET_TYPE): Macros to retrive the car index and
+	packet type from the header.
+	(SHORT_PACKET_DATA, SPECIAL_PACKET_DATA): Macros to retrieve any
+	data that can be hidden in the spare space of the packet header.
+	(SHORT_PACKET_NUL): Macro to check whether the short packet really
+	has data or not.
+	(LONG_PACKET_LEN, SHORT_PACKET_LEN, SPECIAL_PACKET_LEN): Macros
+	to return the expected size of the full packet depending on
+	type.
+	(CarPacketType): enum of packet types discovered so far that are
+	related to cars.
+	(SystemPacketType): enum of packet types discovered so far that
+	aren't related to cars, shares the same type space though.
+	* src/stream.h: Update.
+	* README: Update with information on the data stream format.
+
 	* src/stream.c (read_stream): Poll the data stream file descriptor
 	and deal with events, if after one second we haven't got any data
 	from it, send it a ping to see whether that wakes it up.
