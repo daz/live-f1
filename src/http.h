@@ -20,19 +20,14 @@
 #ifndef LIVE_F1_HTTP_H
 #define LIVE_F1_HTTP_H
 
-#include <ne_session.h>
-
 #include "live-f1.h"
 
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (ne_session *http_sess,
-				    const char *email, const char *password);
-unsigned int obtain_decryption_key (ne_session *http_sess,
-				    unsigned int event_no, const char *cookie);
-int          obtain_key_frame      (ne_session *http_sess, unsigned int frame,
-				    void *unknown);
+char *       obtain_auth_cookie    (const char *email, const char *password);
+unsigned int obtain_decryption_key (unsigned int event_no, const char *cookie);
+int          obtain_key_frame      (unsigned int frame, void *unknown);
 
 SJR_END_EXTERN
 

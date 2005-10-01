@@ -22,8 +22,6 @@
 
 #include <gettext.h>
 
-#include <ne_session.h>
-
 #include "macros.h"
 
 
@@ -33,18 +31,33 @@
 
 
 /**
+ * EventType:
+ *
+ * Type of event, used to attach meaning to the data when displaying it
+ * in a table.
+ **/
+typedef enum {
+	RACE_EVENT = 1
+	/* Don't know any of the others yet */
+} EventType;
+
+/**
  * CurrentState:
- * @http_sess: neon http session to the web server,
- * @data_sock: data stream socket,
  * @cookie: user's authorisation cookie,
  * @key: decryption key,
- * @frame: last seen key frame.
+ * @frame: last seen key frame,
+ * @event_no: event number,
+ * @event_type: event type.
+ *
+ * Holds the current application state so we don't need to pass around
+ * a lot of variables or keep them globally.
  **/
 typedef struct {
-	ne_session   *http_sess, *auth_sess; /* latter is a hack */
-	int           data_sock;
 	char         *cookie;
-	unsigned int  key, frame;
+	unsigned int  key;
+	unsigned int  frame;
+	unsigned int  event_no;
+	EventType     event_type;
 } CurrentState;
 
 

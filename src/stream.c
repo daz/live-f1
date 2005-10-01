@@ -115,6 +115,7 @@ open_stream (const char   *hostname,
 /**
  * read_stream:
  * @state: application state structure,
+ * @sock: socket to read from.
  *
  * Read a block of data from the stream, this isn't quite as simple as it
  * seems because the server won't actually send us data unless we ping it;
@@ -124,13 +125,13 @@ open_stream (const char   *hostname,
  * Returns: 0 if socket closed, > 0 on success, < 0 on error.
  **/
 int
-read_stream (CurrentState *state)
+read_stream (CurrentState *state, int sock)
 {
 	struct pollfd poll_fd;
 	static int    timer = 0;
 	int           ret;
 
-	poll_fd.fd = state->data_sock;
+	poll_fd.fd = sock;
 	poll_fd.events = POLLIN;
 	poll_fd.revents = 0;
 
@@ -147,7 +148,7 @@ read_stream (CurrentState *state)
 
 		/* Wake the server up */
 		buf[0] = 0x10;
-		ret = write (state->data_sock, buf, sizeof (buf));
+		ret = write (sock, buf, sizeof (buf));
 		if (ret < 0)
 			goto error;
 
@@ -161,7 +162,7 @@ read_stream (CurrentState *state)
 
 	/* Server went away */
 	if (poll_fd.revents & POLLHUP) {
-		close (state->data_sock);
+		close (sock);
 		return 0;
 	}
 
@@ -169,11 +170,11 @@ read_stream (CurrentState *state)
 	if (poll_fd.revents & POLLIN) {
 		unsigned char buf[512];
 
-		ret = read (state->data_sock, buf, sizeof (buf));
+		ret = read (sock, buf, sizeof (buf));
 		if (ret < 0) {
 			goto error;
 		} else if (ret == 0) {
-			close (state->data_sock);
+			close (sock);
 			return 0;
 		}
 
@@ -183,7 +184,7 @@ read_stream (CurrentState *state)
 	timer = 0;
 	return ret;
 error:
-	close (state->data_sock);
+	close (sock);
 	return -1;
 }
 

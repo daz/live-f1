@@ -66,7 +66,6 @@ numlen (unsigned int number)
 
 /**
  * obtain_auth_cookie:
- * @http_sess: neon http session to use,
  * @email: e-mail address registered with the F1 website,
  * @password: paassword registered for @email.
  *
@@ -79,10 +78,10 @@ numlen (unsigned int number)
  * Returns: cookie in newly allocated string or NULL on failure.
  **/
 char *
-obtain_auth_cookie (ne_session *http_sess,
-		    const char *email,
+obtain_auth_cookie (const char *email,
 		    const char *password)
 {
+	ne_session *sess;
 	ne_request *req;
 	char       *cookie = NULL, *body, *e_email, *e_password;
 
@@ -96,8 +95,11 @@ obtain_auth_cookie (ne_session *http_sess,
 	free (e_password);
 	free (e_email);
 
+	sess = ne_session_create ("http", "live-timing.formula1.com", 80);
+	ne_set_useragent (sess, PACKAGE_STRING);
+
 	/* Create the request */
-	req = ne_request_create (http_sess, "POST", LOGIN_URL);
+	req = ne_request_create (sess, "POST", LOGIN_URL);
 	ne_add_request_header (req, "Content-Type",
 			       "application/x-www-form-urlencoded");
 	ne_set_request_body_buffer (req, body, strlen (body));
@@ -110,7 +112,7 @@ obtain_auth_cookie (ne_session *http_sess,
 	/* Dispatch the event, and check it was a good one */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("login request failed"), ne_get_error (http_sess));
+			 _("login request failed"), ne_get_error (sess));
 	} else if (ne_get_status (req)->code >= 400) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("login request failed"),
@@ -118,6 +120,8 @@ obtain_auth_cookie (ne_session *http_sess,
 	}
 
 	ne_request_destroy (req);
+	ne_session_destroy (sess);
+
 	return cookie;
 }
 
@@ -151,7 +155,6 @@ parse_cookie_hdr (char       **value,
 
 /**
  * obtain_decryption_key:
- * @http_sess: neon http session to use,
  * @event_no: official event number,
  * @cookie: uri-encoded cookie.
  *
@@ -163,10 +166,10 @@ parse_cookie_hdr (char       **value,
  * Returns: key obtained on success, or zero on failure.
  **/
 unsigned int
-obtain_decryption_key (ne_session   *http_sess,
-		       unsigned int  event_no,
+obtain_decryption_key (unsigned int  event_no,
 		       const char   *cookie)
 {
+	ne_session   *sess;
 	ne_request   *req;
 	char         *url;
 	unsigned int  key = 0;
@@ -177,8 +180,11 @@ obtain_decryption_key (ne_session   *http_sess,
 		      + strlen (cookie) + 11);
 	sprintf (url, "%s%u.asp?auth=%s", KEY_URL_BASE, event_no, cookie);
 
+	sess = ne_session_create ("http", "live-timing.formula1.com", 80);
+	ne_set_useragent (sess, PACKAGE_STRING);
+
 	/* Create the request */
-	req = ne_request_create (http_sess, "GET", url);
+	req = ne_request_create (sess, "GET", url);
 	ne_add_response_body_reader (req, ne_accept_2xx,
 				     (ne_block_reader) parse_key_body, &key);
 	free (url);
@@ -186,12 +192,14 @@ obtain_decryption_key (ne_session   *http_sess,
 	/* Dispatch the event */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key request failed"), ne_get_error (http_sess));
+			 _("key request failed"), ne_get_error (sess));
 	}
 
 	info (3, _("Got decryption key: %08x\n"), key);
 
 	ne_request_destroy (req);
+	ne_session_destroy (sess);
+
 	return key;
 }
 
@@ -226,7 +234,6 @@ parse_key_body (unsigned int *key,
 
 /**
  * obtain_key_frame:
- * @http_sess: the neon session to use,
  * @frame: key frame number to obtain,
  * @userdata: pointer to pass to stream parser.
  *
@@ -236,10 +243,10 @@ parse_key_body (unsigned int *key,
  * Returns: 0 on success, non-zero on failure.
  **/
 int
-obtain_key_frame (ne_session   *http_sess,
-		  unsigned int  frame,
+obtain_key_frame (unsigned int  frame,
 		  void         *userdata)
 {
+	ne_session *sess;
 	ne_request *req;
 	char       *url;
 
@@ -256,8 +263,11 @@ obtain_key_frame (ne_session   *http_sess,
 		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);
 	}
 
+	sess = ne_session_create ("http", "localhost", 80);
+	ne_set_useragent (sess, PACKAGE_STRING);
+
 	/* Create the request */
-	req = ne_request_create (http_sess, "GET", url);
+	req = ne_request_create (sess, "GET", url);
 	ne_add_response_body_reader (req, ne_accept_2xx,
 				     (ne_block_reader) parse_stream_block,
 				     userdata);
@@ -266,7 +276,7 @@ obtain_key_frame (ne_session   *http_sess,
 	/* Dispatch the event */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key request failed"), ne_get_error (http_sess));
+			 _("key request failed"), ne_get_error (sess));
 
 		ne_request_destroy (req);
 		return 1;
@@ -275,6 +285,7 @@ obtain_key_frame (ne_session   *http_sess,
 	info (3, _("Key frame received\n"));
 
 	ne_request_destroy (req);
-	ne_close_connection (http_sess);
+	ne_session_destroy (sess);
+
 	return 0;
 }

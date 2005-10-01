@@ -1,5 +1,23 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (CurrentState): Remove http session stuff from
+	CurrentState, because we actually can't make multiple requests
+	on the same session so will need a new one each time anyway.
+	Also remove data_sock, it's not needed.
+	(EventType): Add enum for possible event types.
+	* src/main.c (main): Store the socket in an old-fashioned int
+	and pass to read_stream again.  Drop session creation.
+	* src/stream.c (read_stream): Take sock again.
+	* src/stream.h: Update.
+	* src/http.c (obtain_auth_cookie): Remove http_sess parameter and
+	instead set it up and tear it down in the function.
+	(obtain_decryption_key): Likewise.
+	(obtain_key_frame): Likewise.
+	* src/http.h: Update.
+	* src/packet.c (handle_system_packet): No longer pass session to
+	obtain_decryption_key() or obtain_key_frame().  Store event number
+	and type in the state struct.
+
 	* src/live-f1.h (CurrentState): Add a structure that we can
 	pass around with our state rather than using globals or other
 	evil things.

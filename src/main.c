@@ -27,7 +27,6 @@
 #include <locale.h>
 
 #include <ne_socket.h>
-#include <ne_session.h>
 
 #include "live-f1.h"
 #include "http.h"
@@ -46,6 +45,7 @@ main (int   argc,
       char *argv[])
 {
 	CurrentState  state;
+	int           sock;
 
 	setlocale (LC_ALL, "");
 	bindtextdomain (PACKAGE, LOCALEDIR);
@@ -61,41 +61,21 @@ main (int   argc,
 
 	memset (&state, 0, sizeof (state));
 
-	state.auth_sess = ne_session_create ("http", "live-timing.formula1.com", 80);
-	ne_set_useragent (state.auth_sess, PACKAGE_STRING);
-
-	state.cookie = obtain_auth_cookie (state.auth_sess, "scott-fia@netsplit.com", "mka773624");
+	state.cookie = obtain_auth_cookie ("scott-fia@netsplit.com",
+					   "mka773624");
 	if (! state.cookie) {
 		printf ("Unable to obtain authorisation cookie.\n");
 		return 1;
 	}
 
-	/*
-	key = obtain_decryption_key (http_sess, 6241, cookie);
-	if (! key) {
-		printf ("Unable to obtain decryption key.\n");
-		return 1;
-	}
-	*/
-
-	state.http_sess = ne_session_create ("http", "localhost", 80);
-	ne_set_useragent (state.http_sess, PACKAGE_STRING);
-
-	state.data_sock = open_stream ("localhost", 4321);
-	if (state.data_sock < 0) {
+	sock = open_stream ("localhost", 4321);
+	if (sock < 0) {
 		printf ("Unable to open data stream.\n");
 		return 1;
 	}
 
-	/*
-	obtain_key_frame (http_sess, 151, NULL);
-	*/
-
-	while (read_stream (&state) > 0)
+	while (read_stream (&state, sock) > 0)
 		;
-
-	ne_session_destroy (state.http_sess);
-	ne_session_destroy (state.auth_sess);
 
 	return 0;
 }
