@@ -1,5 +1,29 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/http.c (obtain_decryption_key): Create a neon session and
+	call obtain_cookie() and obtain_key() to do the necessary magic
+	to obtain the decryption key for a race.
+	(obtain_cookie): Perform a login request on the website to obtain
+	the authorisation cookie.
+	(parse_cookie_hdr): Parse the set-cookie header for the request
+	to obtain it.
+	(numlen): Inline to calculate the length of a number for sprintf.
+	(obtain_key): Send the request to obtain the decryption key for
+	a session giving the authorisation key as credentials to have it.
+	(parse_key_body): Parse the body of the key request, storing
+	hexadecimal digits in the key until we run out.
+	* src/main.c (main): Initialise gettext and neon, stash the program
+	name, also include some debugging code for now.
+	* src/live-f1.h: Add main header file to declare generally useful
+	things like program_name and gettext macros.
+	* src/macros.h: Copy from my template.
+	* src/gettext.h: Copy from gettext distribution.
+	* src/Makefile.am (live_f1_SOURCES): Add htp.c, http.h and
+	live-f1.h
+	(AM_CPPFLAGS): Replace INCLUDES and DEFS with single modern variable.
+	(LDADD): Added NEON_LIBS.
+	* README: Document the technique for obtaining the decryption key.
+
 	* configure.ac: Add check for neon using pkg-config. Remove a
 	couple of bits left over from my template.
 

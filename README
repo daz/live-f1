@@ -1,0 +1,54 @@
+Authorisation
+-------------
+
+In order to decrypt various parts of the data stream (see Encryption)
+we need to obtain the session decryption key from the web server.  The
+two pieces of information needed to request this are the session
+number, obtained from the primary key frame, and an authorisation
+cookie for a registered user.
+
+There's no magic to obtaining this cookie; registration is currently
+free and is performed through a web form that appears when you first
+visit the Live Timing section of the Formula 1 website.  Obtaining the
+cookie is simply a matter of logging in by placing the e-mail address
+and password you registered with in the adjacent web form.
+
+It's therefore quite easy for us to act as a web browser and obtain
+the cookie by constructing a POST to the right URL with the e-mail
+address and password obtained from the user.  The cookie is returned
+in the standard Set-Cookie header.
+
+  --> POST /reg/login.asp HTTP/1.1
+      Host: live-timing.formula1.com
+      Content-Type: application/x-www-form-urlencoded
+      Content-Length: $len
+
+      email=$email&password=$password
+
+  <-- HTTP/1.1 302 Object moved
+      Location: http://www.formula1.com/race/livetiming/popup/0.html
+      Set-Cookie: USER=$cookie; expires=...
+
+Obviously we're not a web browser so we don't worry about following
+the redirect which is intended to give the user the applet now they've
+logged in.  We just snatch the user's authorisation cookie out of the
+repsonse and move on to the next job.
+
+
+Our next job is to obtain the decryption key, this is something the
+Java applet seems to do itself and is simply a matter of issuing a GET
+request to the right URL and getting the response.  The URL has to be
+constructed, the filename portion is the session number and the
+authorisation cookie is passed as a query parameter.
+
+  --> GET /reg/getkey/$session.asp?auth=$cookie HTTP/1.1
+      Host: live-timing.formula1.com
+
+  <-- HTTP/1.1 200 OK
+      Content-Type: text/html
+      Content-Length: 8
+
+      $key
+
+Ignore the fact the web server thinks it's returning us HTML, the key
+is in plain text and consists of 8 hexadecimal digits.

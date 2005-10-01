@@ -17,49 +17,18 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifdef HAVE_CONFIG_H
-# include <config.h>
-#endif /* HAVE_CONFIG_H */
+#ifndef LIVE_F1_HTTP_H
+#define LIVE_F1_HTTP_H
 
-#include <stdio.h>
-#include <locale.h>
-
-#include <ne_socket.h>
-
-#include "live-f1.h"
-#include "http.h"
+#include "macros.h"
 
 
-/* Program name */
-const char *program_name = NULL;
+SJR_BEGIN_EXTERN
 
+int obtain_decryption_key (const char *hostname, unsigned int session,
+			   const char *email, const char *password,
+			   unsigned int *key)
 
-int
-main (int   argc,
-      char *argv[])
-{
-	unsigned int key;
+SJR_END_EXTERN;
 
-	setlocale (LC_ALL, "");
-	bindtextdomain (PACKAGE, LOCALEDIR);
-	textdomain (PACKAGE);
-
-	program_name = argv[0];
-
-	if (ne_sock_init ()) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("unable to initialise http library"));
-		return 1;
-	}
-
-	if (obtain_decryption_key ("live-timing.formula1.com", 6241,
-				   "scott-fia@netsplit.com", "mka773624",
-				   &key)) {
-		printf ("Unable to obtain decryption key.\n");
-		return 1;
-	}
-
-	printf ("Decryption key for session 6241 is %x\n", key);
-
-	return 0;
-}
+#endif /* LIVE_F1_HTTP_H */
