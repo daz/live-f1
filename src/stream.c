@@ -338,7 +338,7 @@ next_packet (CurrentState         *state,
 			decrypt = 1;
 			break;
 		case SYS_UNKNOWN_LONG_A:
-		case SYS_UNKNOWN_LONG_B:
+		case SYS_NOTICE:
 		case SYS_UNKNOWN_LONG_C:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);

@@ -25,6 +25,8 @@
 
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "live-f1.h"
 #include "http.h"
@@ -111,7 +113,45 @@ handle_system_packet (CurrentState *state,
 
 		break;
 	}
+	case SYS_COPYRIGHT:
+		/* Copyright Notice
+		 * Format: string
+		 *
+		 * Plain text copyright notice in the start of the feed.
+		 */
+	{
+		char *message;
+
+		message = malloc (packet->len + 1);
+		strncpy (message, (char *)packet->payload, packet->len);
+		message[packet->len] = 0;
+
+		info (2, "%s\n", message);
+
+		free(message);
+		break;
+	}
+	case SYS_NOTICE:
+		/* Important System Notice
+		 * Format: string
+		 *
+		 * Various important system notices get displayed this
+		 * way.
+		 */
+	{
+		char *message;
+
+		message = malloc (packet->len + 1);
+		strncpy (message, (char *)packet->payload, packet->len);
+		message[packet->len] = 0;
+
+		info (0, "%s\n", message);
+
+		free(message);
+		break;
+	}
 	default:
+		/*
 		printf ("Unhandled system packet:\n");
 		printf ("    type: %d\n", packet->type);
 		printf ("    data: %d\n", packet->data);
@@ -126,6 +166,7 @@ handle_system_packet (CurrentState *state,
 					printf (".");
 		}
 		printf ("\n");
+		*/
 		break;
 	}
 }

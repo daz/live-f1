@@ -263,7 +263,7 @@ obtain_key_frame (unsigned int  frame,
 		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);
 	}
 
-	sess = ne_session_create ("http", "live-timing.formula1.com", 80);
+	sess = ne_session_create ("http", "localhost", 80);
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */

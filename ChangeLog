@@ -1,5 +1,8 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_system_packet): Add handling for
+	SYS_COPYRIGHT and new SYS_NOTICE packets.
+	
 	* src/packet.c (handle_car_packet): Change packet parameter to
 	a Packet structure rather than binary data.
 	(handle_system_packet): Likewise and adjust code to match.
