@@ -79,6 +79,10 @@ varies for system packets.
 Finally there's an extra bugger of a packet, the system packet with
 type 0x07 which has zero data/length but two bytes following it.
 
+While the packet headers themselves are in the clear, often the
+following data is encrypted and needs to be decrypted before it can be
+used (see Encryption).
+
 
 Key Frames
 ----------
@@ -170,3 +174,19 @@ authorisation cookie is passed as a query parameter.
 
 Ignore the fact the web server thinks it's returning us HTML, the key
 is in plain text and consists of 8 hexadecimal digits.
+
+
+Encryption
+----------
+
+As mentioned above many of the packet payloads are encrypted,
+fortunately it is only a simple symmetric stream cypher based around
+shift and xor.
+
+The decryption key is obtained from the web server (see Authorisation)
+and seeded, we then take care to decrypt any packet that appears to be
+encrypted to ensure we progress through the salt at the same rate the
+server does.
+
+The salt is reset back to the initial seed every time a new key frame
+is saved, or a new event starts.

@@ -1,5 +1,7 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* README: Document the basics of encryption.
+
 	* src/live-f1.h (CurrentState): Add the decryption salt to the
 	state structure.
 	* src/stream.c (reset_decryption): Add function to reset the
