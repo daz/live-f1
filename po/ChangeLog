@@ -1,0 +1,5 @@
+2005-10-01  Scott James Remnant  <scott@netsplit.com>
+
+	* LINGUAS: Added empty file.
+	* POTFILES.in: Added src/main.c
+	* Makevars: Created from template.
