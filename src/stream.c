@@ -1,5 +1,7 @@
 /* live-f1
  *
+ * stream.c - data stream and key frame parsing
+ *
  * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,23 +19,19 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_HTTP_H
-#define LIVE_F1_HTTP_H
-
-#include <ne_session.h>
-
-#include "macros.h"
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif /* HAVE_CONFIG_H */
 
 
-SJR_BEGIN_EXTERN
+#include "live-f1.h"
+#include "stream.h"
 
-char *       obtain_auth_cookie    (ne_session *http_sess,
-				    const char *email, const char *password);
-unsigned int obtain_decryption_key (ne_session *http_sess,
-				    unsigned int event_no, const char *cookie);
-int          obtain_key_frame      (ne_session *http_sess, unsigned int frame,
-				    void *unknown);
 
-SJR_END_EXTERN
-
-#endif /* LIVE_F1_HTTP_H */
+void
+parse_stream_block (void       *userdata,
+		    const char *buf,
+		    size_t      len)
+{
+	info (3, _("Received %zi bytes\n"), len);
+}

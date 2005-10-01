@@ -17,23 +17,16 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_HTTP_H
-#define LIVE_F1_HTTP_H
-
-#include <ne_session.h>
+#ifndef LIVE_F1_STREAM_H
+#define LIVE_F1_STREAM_H
 
 #include "macros.h"
 
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (ne_session *http_sess,
-				    const char *email, const char *password);
-unsigned int obtain_decryption_key (ne_session *http_sess,
-				    unsigned int event_no, const char *cookie);
-int          obtain_key_frame      (ne_session *http_sess, unsigned int frame,
-				    void *unknown);
+void parse_stream_block (void *userdata, const char *buf, size_t len);
 
 SJR_END_EXTERN
 
-#endif /* LIVE_F1_HTTP_H */
+#endif /* LIVE_F1_STREAM_H */

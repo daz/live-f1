@@ -23,15 +23,14 @@
 # include <config.h>
 #endif /* HAVE_CONFIG_H */
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <ne_session.h>
 #include <ne_request.h>
 #include <ne_uri.h>
 
 #include "live-f1.h"
+#include "stream.h"
 #include "http.h"
 
 
@@ -43,11 +42,7 @@
 
 
 /* Forward prototypes */
-static char *obtain_cookie    (ne_session *sess,
-			       const char *email, const char *password);
 static void  parse_cookie_hdr (char **value, const char  *header);
-static int   obtain_key       (ne_session *sess, unsigned int session,
-			       const char *cookie, unsigned int *key);
 static void  parse_key_body   (unsigned int *key, const char *buf, size_t len);
 
 
@@ -70,66 +65,28 @@ numlen (unsigned int number)
 
 
 /**
- * obtain_decryption_key:
- * @hostname: live timing hostname,
- * @session: race session number,
- * @email: e-mail address registered with the F1 website,
- * @password: paassword registered for @email,
- * @key: pointer to store decryption key in.
- *
- * Obtains the decryption key for the given race session, this involves
- * obtaining an authorisation cookie from the F1 website itself and then
- * using that to request the key.
- *
- * Returns: 0 on success, non-zero on failure.
- **/
-int
-obtain_decryption_key (const char   *hostname,
-		       unsigned int  session,
-		       const char   *email,
-		       const char   *password,
-		       unsigned int *key)
-{
-	ne_session *sess;
-	char       *cookie;
-	int         ret = 1;
-
-	sess = ne_session_create ("http", hostname, 80);
-	ne_set_useragent (sess, PACKAGE_STRING);
-
-	cookie = obtain_cookie (sess, email, password);
-	if (cookie) {
-		ret = obtain_key (sess, session, cookie, key);
-		free (cookie);
-	}
-
-	ne_session_destroy (sess);
-
-	return ret;
-}
-
-/**
- * obtain_cookie:
- * @sess: the neon session to use,
+ * obtain_auth_cookie:
+ * @http_sess: neon http session to use,
  * @email: e-mail address registered with the F1 website,
  * @password: paassword registered for @email.
  *
- * Obtains the user's authentication cookie for the live timing website
- * by logging in with their e-mail address and password.
+ * Obtains the user's authentication cookie from the Live Timing website
+ * by logging in with their e-mail address and password and stealing out
+ * of the response headers.
  *
  * For convenience sake, the cookie is never unencoded.
  *
  * Returns: cookie in newly allocated string or NULL on failure.
  **/
-static char *
-obtain_cookie (ne_session *sess,
-	       const char *email,
-	       const char *password)
+char *
+obtain_auth_cookie (ne_session *http_sess,
+		    const char *email,
+		    const char *password)
 {
 	ne_request *req;
 	char       *cookie = NULL, *body, *e_email, *e_password;
 
-	printf ("%s\n", _("Obtaining authentication cookie ..."));
+	info (1, _("Obtaining authentication cookie ...\n"));
 
 	/* Encode the e-mail and password as a form */
 	e_email = ne_path_escape (email);
@@ -140,7 +97,7 @@ obtain_cookie (ne_session *sess,
 	free (e_email);
 
 	/* Create the request */
-	req = ne_request_create (sess, "POST", LOGIN_URL);
+	req = ne_request_create (http_sess, "POST", LOGIN_URL);
 	ne_add_request_header (req, "Content-Type",
 			       "application/x-www-form-urlencoded");
 	ne_set_request_body_buffer (req, body, strlen (body));
@@ -153,7 +110,7 @@ obtain_cookie (ne_session *sess,
 	/* Dispatch the event, and check it was a good one */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("login request failed"), ne_get_error (sess));
+			 _("login request failed"), ne_get_error (http_sess));
 	} else if (ne_get_status (req)->code >= 400) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("login request failed"),
@@ -188,53 +145,54 @@ parse_cookie_hdr (char       **value,
 	*value = malloc (len + 1);
 	strncpy (*value, header, len);
 	(*value)[len] = 0;
+
+	info (3, _("Got authentication cookie: %s\n"), *value);
 }
 
 /**
- * obtain_key:
- * @sess: the neon session to use,
- * @session: race session number,
+ * obtain_decryption_key:
+ * @http_sess: neon http session to use,
+ * @event_no: official event number,
  * @cookie: uri-encoded cookie.
- * @key: pointer to store decryption key in.
  *
- * Requests the decryption key for the race session using the authorisation
- * cookie obtained.
+ * Obtains the decryption key for the event using the authorisation
+ * cookie of a registered user.
  *
- * Returns: 0 on success, non-zero on failure.
+ * @cookie should be supplied already uri-encoded.
+ *
+ * Returns: key obtained on success, or zero on failure.
  **/
-static int
-obtain_key (ne_session   *sess,
-	    unsigned int  session,
-	    const char   *cookie,
-	    unsigned int *key)
+unsigned int
+obtain_decryption_key (ne_session   *http_sess,
+		       unsigned int  event_no,
+		       const char   *cookie)
 {
-	ne_request *req;
-	char       *url;
-	int         ret = 0;
+	ne_request   *req;
+	char         *url;
+	unsigned int  key = 0;
 
-	*key = 0;
+	info (1, _("Obtaining decryption key ...\n"));
 
-	printf ("%s\n", _("Obtaining decryption key ..."));
-
-	url = malloc (strlen (KEY_URL_BASE) + numlen (session)
+	url = malloc (strlen (KEY_URL_BASE) + numlen (event_no)
 		      + strlen (cookie) + 11);
-	sprintf (url, "%s%u.asp?auth=%s", KEY_URL_BASE, session, cookie);
+	sprintf (url, "%s%u.asp?auth=%s", KEY_URL_BASE, event_no, cookie);
 
 	/* Create the request */
-	req = ne_request_create (sess, "GET", url);
+	req = ne_request_create (http_sess, "GET", url);
 	ne_add_response_body_reader (req, ne_accept_2xx,
-				     (ne_block_reader) parse_key_body, key);
+				     (ne_block_reader) parse_key_body, &key);
+	free (url);
 
 	/* Dispatch the event */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key request failed"), ne_get_error (sess));
-		ret = 1;
+			 _("key request failed"), ne_get_error (http_sess));
 	}
 
-	free (url);
+	info (3, _("Got decryption key: %08x\n"), key);
+
 	ne_request_destroy (req);
-	return ret;
+	return key;
 }
 
 /**
@@ -264,4 +222,58 @@ parse_key_body (unsigned int *key,
 			break;
 		}
 	}
+}
+
+/**
+ * obtain_key_frame:
+ * @http_sess: the neon session to use,
+ * @frame: key frame number to obtain,
+ * @userdata: pointer to pass to stream parser.
+ *
+ * Obtains the key frame numbered from the website and arranges for the
+ * data to be parsed immediately with the data stream parser.
+ *
+ * Returns: 0 on success, non-zero on failure.
+ **/
+int
+obtain_key_frame (ne_session   *http_sess,
+		  unsigned int  frame,
+		  void         *userdata)
+{
+	ne_request *req;
+	char       *url;
+
+	if (frame > 0) {
+		info (2, _("Obtaining key frame %d ...\n"), frame);
+
+		url = malloc (strlen (KEYFRAME_URL_PREFIX)
+			      + numlen (frame) + 6);
+		sprintf (url, "%s_%d.bin", KEYFRAME_URL_PREFIX, frame);
+	} else {
+		info (1, _("Obtaining master key frame ...\n"));
+
+		url = malloc (strlen (KEYFRAME_URL_PREFIX) + 5);
+		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);
+	}
+
+	/* Create the request */
+	req = ne_request_create (http_sess, "GET", url);
+	ne_add_response_body_reader (req, ne_accept_2xx,
+				     (ne_block_reader) parse_stream_block,
+				     userdata);
+	free (url);
+
+	/* Dispatch the event */
+	if (ne_request_dispatch (req)) {
+		fprintf (stderr, "%s: %s: %s\n", program_name,
+			 _("key request failed"), ne_get_error (http_sess));
+
+		ne_request_destroy (req);
+		return 1;
+	}
+
+	info (3, _("Key frame received\n"));
+
+	ne_request_destroy (req);
+	return 0;
 }

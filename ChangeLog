@@ -1,5 +1,21 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (info): Add function for easy printing.
+	* src/http.c (obtain_decryption_key): Drop this function entirely.
+	(obtain_cookie): Change from static to extern, it's useful to
+	get the cookie early and keep it around.  Rename to
+	obtain_auth_cookie.
+	(obtain_key): Change from static to extern and change to directly
+	return the key, we'll use 0 for a failure as that's also what'll
+	happen on 404, etc. anyway.  Rename to obtain_decryption_key.
+	(obtain_key_frame): Make a request for a key frame and hand parsing
+	off to parse_stream_block().
+	* src/http.h: Update.
+	* src/main.c (main): Move session creation and teardown to here.
+	* src/stream.c (parse_stream_block): Add stub function.
+	* src/stream.h: Associated header file.
+	* src/Makefile.am (live_f1_SOURCES): Add stream.c and stream.h.
+
 	* src/http.c (obtain_decryption_key): Create a neon session and
 	call obtain_cookie() and obtain_key() to do the necessary magic
 	to obtain the decryption key for a race.

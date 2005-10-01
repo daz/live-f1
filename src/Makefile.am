@@ -12,7 +12,8 @@ bin_PROGRAMS = \
 
 live_f1_SOURCES = \
 	main.c live-f1.h \
-	http.c http.h
+	http.c http.h \
+	stream.c stream.h
 
 
 clean-local:
