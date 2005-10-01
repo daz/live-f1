@@ -2,6 +2,7 @@
 *.gcda
 *.gcno
 .deps
+core
 Makefile
 Makefile.in
 Makefile.in.in
