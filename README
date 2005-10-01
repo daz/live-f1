@@ -1,3 +1,39 @@
+Key Frames
+----------
+
+The data stream is a continuous feed of the latest information from
+the timing system at the track, to enable users to connect at any
+point in the race, the state of the event is regularly saved into
+"key frames".
+
+These key frames are in the same basic format as the data stream and
+are published as files on the web server.  This means they are fetched
+out of band using HTTP, but should be parsed before reading the data
+stream.
+
+Each key frame is numbered, except for a single master key frame.  The
+data stream contains regular packets indicating the current key frame
+number, including an initial packet that tells you which key frame you
+need to fetch first to get up to speed.
+
+I'm not entirely sure what the purpose of the master key frame is, as
+you can obtain the same information from whatever key frame marker you
+see when you connect to the data stream.  Perhaps they serve a purpose
+at the very start of an event when there may not be any key frames.
+
+  --> GET /keyframe_$frame.bin HTTP/1.1
+      Host: live-timing.formula1.com
+
+  <-- HTTP/1.1 200 OK
+      Content-Type application/octet-stream
+
+      $data
+
+Note that the frame number has a minimum of five digits and should be
+zero-padded for smaller numbers.  To obtain the master key frame, the
+URL /keyframe.bin should be used instead.
+
+
 Authorisation
 -------------
 

@@ -247,8 +247,8 @@ obtain_key_frame (ne_session   *http_sess,
 		info (2, _("Obtaining key frame %d ...\n"), frame);
 
 		url = malloc (strlen (KEYFRAME_URL_PREFIX)
-			      + numlen (frame) + 6);
-		sprintf (url, "%s_%d.bin", KEYFRAME_URL_PREFIX, frame);
+			      + MIN(numlen (frame), 5) + 6);
+		sprintf (url, "%s_%05d.bin", KEYFRAME_URL_PREFIX, frame);
 	} else {
 		info (1, _("Obtaining master key frame ...\n"));
 

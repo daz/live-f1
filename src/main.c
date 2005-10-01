@@ -75,7 +75,12 @@ main (int   argc,
 		return 1;
 	}
 
-	obtain_key_frame (http_sess, 0, NULL);
+	ne_session_destroy (http_sess);
+
+	http_sess = ne_session_create ("http", "localhost", 80);
+	ne_set_useragent (http_sess, PACKAGE_STRING);
+
+	obtain_key_frame (http_sess, 151, NULL);
 
 	ne_session_destroy (http_sess);
 

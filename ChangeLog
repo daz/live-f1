@@ -1,5 +1,10 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (main): Use localhost for the key frame data.
+	* src/http.c (obtain_key_frame): Ensure a minimum of five digits
+	for the key frame number by zero-padding.
+	* README: Document key frames and what they mean to us.
+
 	* src/main.c (info): Add function for easy printing.
 	* src/http.c (obtain_decryption_key): Drop this function entirely.
 	(obtain_cookie): Change from static to extern, it's useful to
