@@ -1,4 +1,7 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* configure.ac: Add check for neon using pkg-config. Remove a
+	couple of bits left over from my template.
+
 	* ChangeLog: Initial project infrastructure created.
 

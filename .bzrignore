@@ -1,6 +1,7 @@
 *.gcov
 *.gcda
 *.gcno
+.deps
 Makefile
 Makefile.in
 Makefile.in.in

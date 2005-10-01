@@ -13,9 +13,9 @@ AM_GNU_GETTEXT()
 
 # Checks for programs.
 AC_PROG_CC
-AC_PROG_LIBTOOL
 
 # Checks for libraries.
+PKG_CHECK_MODULES([NEON], [neon >= 0.24.0])
 
 # Checks for header files.
 
@@ -28,7 +28,6 @@ SJR_COMPILER_WARNINGS
 SJR_COMPILER_OPTIMISATIONS
 SJR_COMPILER_COVERAGE
 SJR_LINKER_OPTIMISATIONS
-SJR_LINKER_VERSION_SCRIPT
 
 AC_CONFIG_FILES([ Makefile po/Makefile.in intl/Makefile src/Makefile ])
 AC_CONFIG_HEADERS([config.h])
