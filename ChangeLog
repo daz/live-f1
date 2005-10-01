@@ -1,5 +1,25 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (CurrentState): Add a structure that we can
+	pass around with our state rather than using globals or other
+	evil things.
+	* src/main.c (main): Rework to setup the CurrentState struct
+	and pass it about.
+	* src/packet.c (handle_car_packet): Add a stub function for 
+	handling car-related packets when we get around to it.
+	(handle_system_packet): Add a function for handling system
+	packets, and handle the SYS_EVENT_ID and SYS_KEY_FRAME ones.
+	* src/stream.c (parse_stream_block): Make a copy of the packet
+	on the stack so we can be recursive and hand the packet off to
+	either handle_car_packet() or handle_system_packet().
+	(read_stream): Modify to just take CurrentState pointer.
+	(parse_stream_block): Modify to take CurrentState pointer
+	instead of ne_session pointer.
+
+	* src/packet.h (CarPacketType, SystemPacketType): Move enums
+	and related macros into new header.  Add function prototypes.
+	* src/Makefile.am (live_f1_SOURCES): Add packet.c and packet.h.
+
 	* src/stream.c (parse_stream_block): Rename len parameter to
 	buf_len to be more clear, iterate over the packets in the buffer
 	using a static array so we can survive packets happening across

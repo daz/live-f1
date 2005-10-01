@@ -35,59 +35,8 @@
 #include <errno.h>
 
 #include "live-f1.h"
+#include "packet.h"
 #include "stream.h"
-
-
-/* Which car the packet is for */
-#define PACKET_CAR(_p) ((_p)[0] & 0x1f)
-
-/* Which type of packet it is */
-#define PACKET_TYPE(_p) (((_p)[0] >> 5) | (((_p)[1] & 0x01) << 3))
-
-/* Data from a short packet */
-#define SHORT_PACKET_DATA(_p) (((_p)[1] & 0x0e) >> 1)
-
-/* Data from a special packet */
-#define SPECIAL_PACKET_DATA(_p) ((_p)[1] >> 1)
-
-/* Length of the packet if it's one of the long ones */
-#define LONG_PACKET_LEN(_p) (SPECIAL_PACKET_DATA(_p) + 2)
-
-/* Flag for a nominally short packet with no following data */
-#define SHORT_PACKET_NUL(_p) (((_p)[1] & 0xf0) == 0xf0)
-
-/* Length of the packet if it's one of the short ones */
-#define SHORT_PACKET_LEN(_p) ((SHORT_PACKET_NUL(_p) ? 0 : ((_p)[1] >> 4)) + 2)
-
-/* Length of the packet if it's a special one */
-#define SPECIAL_PACKET_LEN(_p) 2
-
-
-/* Types of packets for cars */
-typedef enum {
-	CAR_POSITION_UPDATE,
-	CAR_POSITION,
-	CAR_NUMBER,
-	CAR_DRIVER,
-	/* Everything else is short */
-	CAR_POSITION_HISTORY = 15
-} CarPacketType;
-
-/* Types of non-car packets */
-typedef enum {
-	SYS_EVENT_ID = 1,
-	SYS_KEY_FRAME,
-	SYS_UNKNOWN_SPECIAL_A,
-	SYS_UNKNOWN_LONG_A,
-	SYS_UNKNOWN_SPECIAL_B,
-	SYS_UNKNOWN_LONG_B,
-	SYS_STRANGE_A, /* Always two bytes */
-	SYS_UNKNOWN_SPECIAL_C,
-	SYS_UNKNOWN_SHORT_A,
-	SYS_UNKNOWN_LONG_C,
-	SYS_UNKNOWN_SHORT_B,
-	SYS_COPYRIGHT
-} SystemPacketType;
 
 
 /* Forward prototypes */
@@ -165,8 +114,7 @@ open_stream (const char   *hostname,
 
 /**
  * read_stream:
- * @http_sess: neon http session to use for key frames,
- * @sock: data stream socket to read from.
+ * @state: application state structure,
  *
  * Read a block of data from the stream, this isn't quite as simple as it
  * seems because the server won't actually send us data unless we ping it;
@@ -176,14 +124,13 @@ open_stream (const char   *hostname,
  * Returns: 0 if socket closed, > 0 on success, < 0 on error.
  **/
 int
-read_stream (ne_session *http_sess,
-	     int         sock)
+read_stream (CurrentState *state)
 {
 	struct pollfd poll_fd;
 	static int    timer = 0;
 	int           ret;
 
-	poll_fd.fd = sock;
+	poll_fd.fd = state->data_sock;
 	poll_fd.events = POLLIN;
 	poll_fd.revents = 0;
 
@@ -200,7 +147,7 @@ read_stream (ne_session *http_sess,
 
 		/* Wake the server up */
 		buf[0] = 0x10;
-		ret = write (sock, buf, sizeof (buf));
+		ret = write (state->data_sock, buf, sizeof (buf));
 		if (ret < 0)
 			goto error;
 
@@ -214,7 +161,7 @@ read_stream (ne_session *http_sess,
 
 	/* Server went away */
 	if (poll_fd.revents & POLLHUP) {
-		close (sock);
+		close (state->data_sock);
 		return 0;
 	}
 
@@ -222,35 +169,36 @@ read_stream (ne_session *http_sess,
 	if (poll_fd.revents & POLLIN) {
 		unsigned char buf[512];
 
-		ret = read (sock, buf, sizeof (buf));
+		ret = read (state->data_sock, buf, sizeof (buf));
 		if (ret < 0) {
 			goto error;
 		} else if (ret == 0) {
-			close (sock);
+			close (state->data_sock);
 			return 0;
 		}
 
-		parse_stream_block (http_sess, buf, ret);
+		parse_stream_block (state, buf, ret);
 	}
 
 	timer = 0;
 	return ret;
 error:
-	close (sock);
+	close (state->data_sock);
 	return -1;
 }
 
 /**
  * parse_stream_block:
- * @http_sess: neon http session to use for key frames,
+ * @state: application state structure,
  * @buf: data read from server or key frame,
  * @buf_len: length of @buf.
  *
  * Parse a data stream block obtained either from the data server or a
- * key frame.
+ * key frame.  Calls either handle_car_packet() or handle_system_packet(),
+ * and is safe for those to result in further stream parsing calls.
  **/
 void
-parse_stream_block (ne_session          *http_sess,
+parse_stream_block (CurrentState        *state,
 		    const unsigned char *buf,
 		    size_t               buf_len)
 {
@@ -258,9 +206,19 @@ parse_stream_block (ne_session          *http_sess,
 	static size_t        packet_len = 0;
 
 	while (next_packet (packet, &packet_len, &buf, &buf_len)) {
-		/*info (3, _("PACKET! %zi bytes\n"), packet_len); */
+		unsigned char copy[129];
 
+		/* Make a copy of the packet on the stack and reset
+		 * our static buffer
+		 */
+		memcpy (copy, packet, packet_len);
 		packet_len = 0;
+
+		if (PACKET_CAR (copy)) {
+			handle_car_packet (state, copy);
+		} else {
+			handle_system_packet (state, copy);
+		}
 	}
 }
 
@@ -316,7 +274,6 @@ next_packet (unsigned char        *packet,
 		switch ((SystemPacketType) PACKET_TYPE (packet)) {
 		case SYS_UNKNOWN_SPECIAL_A:
 		case SYS_UNKNOWN_SPECIAL_B:
-		case SYS_UNKNOWN_SPECIAL_C:
 			expected = SPECIAL_PACKET_LEN (packet);
 			break;
 		case SYS_EVENT_ID:
@@ -326,15 +283,19 @@ next_packet (unsigned char        *packet,
 			expected = SHORT_PACKET_LEN (packet);
 			break;
 		case SYS_STRANGE_A:
-			expected = 4;
+			expected = 2;
 			break;
-		default:
+		case SYS_UNKNOWN_LONG_A:
+		case SYS_UNKNOWN_LONG_B:
+		case SYS_UNKNOWN_LONG_C:
+		case SYS_COPYRIGHT:
 			expected = LONG_PACKET_LEN (packet);
 			break;
 		}
 	}
 
 	/* Copy as much as we can */
+	expected += 2;
 	needed = MIN (*buf_len, expected - *packet_len);
 	memcpy (packet + *packet_len, *buf, needed);
 

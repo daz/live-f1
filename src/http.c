@@ -260,7 +260,7 @@ obtain_key_frame (ne_session   *http_sess,
 	req = ne_request_create (http_sess, "GET", url);
 	ne_add_response_body_reader (req, ne_accept_2xx,
 				     (ne_block_reader) parse_stream_block,
-				     http_sess);
+				     userdata);
 	free (url);
 
 	/* Dispatch the event */

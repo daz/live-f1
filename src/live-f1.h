@@ -22,12 +22,30 @@
 
 #include <gettext.h>
 
+#include <ne_session.h>
+
 #include "macros.h"
 
 
 /* Make gettext a little friendlier */
 #define _(_str) gettext (_str)
 #define N_(_str) gettext_noop (_str)
+
+
+/**
+ * CurrentState:
+ * @http_sess: neon http session to the web server,
+ * @data_sock: data stream socket,
+ * @cookie: user's authorisation cookie,
+ * @key: decryption key,
+ * @frame: last seen key frame.
+ **/
+typedef struct {
+	ne_session   *http_sess, *auth_sess; /* latter is a hack */
+	int           data_sock;
+	char         *cookie;
+	unsigned int  key, frame;
+} CurrentState;
 
 
 SJR_BEGIN_EXTERN
