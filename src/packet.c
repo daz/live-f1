@@ -35,30 +35,28 @@
 /**
  * handle_car_packet:
  * @state: application state structure,
- * @packet: packet data.
+ * @packet: decoded packet structure.
  *
  * Handle the car-related packet.
  **/
 void
-handle_car_packet (CurrentState        *state,
-		   const unsigned char *packet)
+handle_car_packet (CurrentState *state,
+		   const Packet *packet)
 {
 }
 
 /**
  * handle_system_packet:
  * @state: application state structure,
- * @packet: packet data.
+ * @packet: decoded packet structure.
  *
  * Handle the system packet.
  **/
 void
-handle_system_packet (CurrentState        *state,
-		      const unsigned char *packet)
+handle_system_packet (CurrentState *state,
+		      const Packet *packet)
 {
-	int len;
-
-	switch ((SystemPacketType) PACKET_TYPE (packet)) {
+	switch ((SystemPacketType) packet->type) {
 	case SYS_EVENT_ID:
 		/* Event Start:
 		 * Format: odd byte, then decimal.
@@ -69,18 +67,16 @@ handle_system_packet (CurrentState        *state,
 		 * the event.
 		 */
 	{
-		unsigned int event_no = 0;
-		int          i;
+		unsigned int event_no = 0, i;
 
-		len = SHORT_PACKET_LEN (packet);
-		for (i = 1; i < len; i++) {
+		for (i = 1; i < packet->len; i++) {
 			event_no *= 10;
-			event_no += packet[2 + i] - '0';
+			event_no += packet->payload[i] - '0';
 		}
 
 		state->key = obtain_decryption_key (event_no, state->cookie);
 		state->event_no = event_no;
-		state->event_type = SHORT_PACKET_DATA (packet);
+		state->event_type = packet->data;
 		reset_decryption (state);
 
 		info (3, _("Begin new event #%d (type: %d)\n"),
@@ -96,12 +92,12 @@ handle_system_packet (CurrentState        *state,
 		 * our counter and carry on
 		 */
 	{
-		unsigned int frame = 0;
+		unsigned int frame = 0, i;
 
-		len = SHORT_PACKET_LEN (packet);
-		while (--len >= 0) {
+		i = packet->len;
+		while (i) {
 			frame <<= 8;
-			frame |= packet[2 + len];
+			frame |= packet->payload[--i];
 		}
 
 		reset_decryption (state);
@@ -116,7 +112,20 @@ handle_system_packet (CurrentState        *state,
 		break;
 	}
 	default:
-/*		info (3, _("Unhandled system packet %d\n"), PACKET_TYPE (packet)); */
+		printf ("Unhandled system packet:\n");
+		printf ("    type: %d\n", packet->type);
+		printf ("    data: %d\n", packet->data);
+		printf ("    len: %d\n", packet->len);
+		printf ("    payload: ");
+		{
+			int i;
+			for (i = 0; i < packet->len; i++)
+				if (packet->payload[i] > ' ' && packet->payload[i] <= '~')
+					printf ("%c", packet->payload[i]);
+			        else
+					printf (".");
+		}
+		printf ("\n");
 		break;
 	}
 }

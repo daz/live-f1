@@ -42,11 +42,34 @@
 /* Encryption seed */
 #define CRYPTO_SEED 0x55555555
 
+/* Which car the packet is for */
+#define PACKET_CAR(_p) ((_p)[0] & 0x1f)
+
+/* Which type of packet it is */
+#define PACKET_TYPE(_p) (((_p)[0] >> 5) | (((_p)[1] & 0x01) << 3))
+
+/* Data from a long packet */
+#define LONG_PACKET_DATA(_p) 0
+
+/* Data from a short packet */
+#define SHORT_PACKET_DATA(_p) (((_p)[1] & 0x0e) >> 1)
+
+/* Data from a special packet */
+#define SPECIAL_PACKET_DATA(_p) ((_p)[1] >> 1)
+
+/* Length of the packet if it's one of the long ones */
+#define LONG_PACKET_LEN(_p) ((_p)[1] >> 1)
+
+/* Length of the packet if it's one of the short ones */
+#define SHORT_PACKET_LEN(_p) (((_p)[1] & 0xf0) == 0xf0 ? 0 : ((_p)[1] >> 4))
+
+/* Length of the packet if it's a special one */
+#define SPECIAL_PACKET_LEN(_p) 0
+
 
 /* Forward prototypes */
-static int next_packet (CurrentState *state, unsigned char *packet,
-			size_t *packet_len, const unsigned char **buf,
-			size_t *buf_len);
+static int next_packet (CurrentState *state, Packet *packet,
+			const unsigned char **buf, size_t *buf_len);
 
 
 /**
@@ -208,22 +231,13 @@ parse_stream_block (CurrentState        *state,
 		    const unsigned char *buf,
 		    size_t               buf_len)
 {
-	static unsigned char packet[129];
-	static size_t        packet_len = 0;
+	Packet packet;
 
-	while (next_packet (state, packet, &packet_len, &buf, &buf_len)) {
-		unsigned char copy[129];
-
-		/* Make a copy of the packet on the stack and reset
-		 * our static buffer
-		 */
-		memcpy (copy, packet, packet_len);
-		packet_len = 0;
-
-		if (PACKET_CAR (copy)) {
-			handle_car_packet (state, copy);
+	while (next_packet (state, &packet, &buf, &buf_len)) {
+		if (packet.car) {
+			handle_car_packet (state, &packet);
 		} else {
-			handle_system_packet (state, copy);
+			handle_system_packet (state, &packet);
 		}
 	}
 }
@@ -231,101 +245,135 @@ parse_stream_block (CurrentState        *state,
 /**
  * next_packet:
  * @state: application state structure,
- * @packet: buffer in which to store the packet,
- * @packet_len: length of packet data already in @packet,
+ * @packet: packet structure to fill,
  * @buf: buffer to copy packet from,
  * @buf_len: length of @buf.
  *
- * Copy a packet, or part thereof, from @buf into @packet updating
- * @packet_len to the new length.  Can be called a byte at a time if
- * that's how the packet arrives.
+ * Takes bytes from @buf until a complete raw packet has been seen,
+ * at which point if fills @packet with the decoded information about
+ * it.
+ *
+ * @buf_len is decreased and @buf moved upwards each time bytes are
+ * taken from it.  The bytes are copied into an internal buffer so
+ * there's no need to worry about packets crossing block boundaries.
  *
  * Returns: 0 if the packet was not complete, 1 if it is complete
  **/
 static int
 next_packet (CurrentState         *state,
-	     unsigned char        *packet,
-	     size_t               *packet_len,
+	     Packet               *packet,
 	     const unsigned char **buf,
 	     size_t               *buf_len)
 {
-	size_t needed, expected;
-	int    decrypt = 0;
+	static unsigned char pbuf[129];
+	static size_t        pbuf_len = 0;
+	size_t               needed;
+	int                  decrypt = 0;
 
 	/* We need a minimum of two bytes to figure out how long the rest
 	 * of it's supposed to be; copy those now if we have room.
 	 */
-	if (*packet_len < 2) {
-		needed = MIN (*buf_len, 2 - *packet_len);
-		memcpy (packet + *packet_len, *buf, needed);
+	if (pbuf_len < 2) {
+		needed = MIN (*buf_len, 2 - pbuf_len);
+		memcpy (pbuf + pbuf_len, *buf, needed);
 
-		*packet_len += needed;
+		pbuf_len += needed;
 		*buf += needed;
 		*buf_len -= needed;
-		if (*packet_len < 2)
+		if (pbuf_len < 2)
 			return 0;
 	}
 
-	/* We have enough of the packet to know how long it is */
-	if (PACKET_CAR (packet)) {
-		switch ((CarPacketType) PACKET_TYPE (packet)) {
+	/* We now have the packet header, this is enough information to
+	 * figure out how long the rest of it is and whether we need to
+	 * decrypt it or not.
+	 *
+	 * Fill in some of the fields now, ok we'll rewrite these every
+	 * time we come through, but that's not really that bad.
+	 */
+	packet->car = PACKET_CAR (pbuf);
+	packet->type = PACKET_TYPE (pbuf);
+
+	if (packet->car) {
+		switch ((CarPacketType) packet->type) {
 		case CAR_POSITION_UPDATE:
-			expected = SPECIAL_PACKET_LEN (packet);
+			packet->len = SPECIAL_PACKET_LEN (pbuf);
+			packet->data = SPECIAL_PACKET_DATA (pbuf);
+			decrypt = 0;
 			break;
 		case CAR_POSITION_HISTORY:
-			expected = LONG_PACKET_LEN (packet);
+			packet->len = LONG_PACKET_LEN (pbuf);
+			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 1;
 			break;
 		default:
-			expected = SHORT_PACKET_LEN (packet);
+			packet->len = SHORT_PACKET_LEN (pbuf);
+			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 1;
 			break;
 		}
 	} else {
-		switch ((SystemPacketType) PACKET_TYPE (packet)) {
-		case SYS_UNKNOWN_SPECIAL_A:
-		case SYS_UNKNOWN_SPECIAL_B:
-			expected = SPECIAL_PACKET_LEN (packet);
-			break;
-		case SYS_STRANGE_A:
-			expected = 2;
-			decrypt = 1;
-			break;
+		switch ((SystemPacketType) packet->type) {
 		case SYS_EVENT_ID:
 		case SYS_KEY_FRAME:
-			expected = SHORT_PACKET_LEN (packet);
+			packet->len = SHORT_PACKET_LEN (pbuf);
+			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 0;
+			break;
+		case SYS_UNKNOWN_SPECIAL_A:
+		case SYS_UNKNOWN_SPECIAL_B:
+			packet->len = SPECIAL_PACKET_LEN (pbuf);
+			packet->data = SPECIAL_PACKET_DATA (pbuf);
+			decrypt = 0;
+			break;
+		case SYS_STRANGE_A:
+			packet->len = 2;
+			packet->data = 0;
+			decrypt = 1;
 			break;
 		case SYS_UNKNOWN_SHORT_A:
 		case SYS_UNKNOWN_SHORT_B:
-			expected = SHORT_PACKET_LEN (packet);
+			packet->len = SHORT_PACKET_LEN (pbuf);
+			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 1;
 			break;
 		case SYS_UNKNOWN_LONG_A:
 		case SYS_UNKNOWN_LONG_B:
 		case SYS_UNKNOWN_LONG_C:
-			expected = LONG_PACKET_LEN (packet);
+			packet->len = LONG_PACKET_LEN (pbuf);
+			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 1;
 			break;
 		case SYS_COPYRIGHT:
-			expected = LONG_PACKET_LEN (packet);
+			packet->len = LONG_PACKET_LEN (pbuf);
+			packet->data = LONG_PACKET_DATA (pbuf);
+			decrypt = 0;
+			break;
+		default:
+			info (3, _("Unknown system packet type: %d\n"),
+			      packet->type);
+			packet->len = 0;
+			packet->data = 0;
 			decrypt = 0;
 			break;
 		}
 	}
 
 	/* Copy as much as we can */
-	expected += 2;
-	needed = MIN (*buf_len, expected - *packet_len);
-	memcpy (packet + *packet_len, *buf, needed);
+	needed = MIN (*buf_len, (packet->len + 2) - pbuf_len);
+	memcpy (pbuf + pbuf_len, *buf, needed);
 
-	*packet_len += needed;
+	pbuf_len += needed;
 	*buf += needed;
 	*buf_len -= needed;
 
-	if (*packet_len == expected) {
+	/* Copy the payload and decrypt if we have a packet */
+	if (pbuf_len == packet->len + 2) {
+		memcpy (packet->payload, pbuf + 2, packet->len);
 		if (decrypt)
-			decrypt_bytes (state, packet + 2, (*packet_len) - 2);
+			decrypt_bytes (state, packet->payload, packet->len);
+
+		pbuf_len = 0;
 		return 1;
 	} else {
 		return 0;

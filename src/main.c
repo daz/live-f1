@@ -69,7 +69,7 @@ main (int   argc,
 		return 1;
 	}
 
-	sock = open_stream ("localhost", 4321);
+	sock = open_stream ("live-timing.formula1.com", 4321);
 	if (sock < 0) {
 		printf ("Unable to open data stream.\n");
 		return 1;

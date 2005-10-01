@@ -1,5 +1,19 @@
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_car_packet): Change packet parameter to
+	a Packet structure rather than binary data.
+	(handle_system_packet): Likewise and adjust code to match.
+	* src/packet.h (Packet): Add a packet structure to hold a decoded
+	packet and copy that about rather than binary evilness.  Update
+	prototypes for functions.  Move macros back into src/stream.c now
+	we don't move binary stuff around.
+	* src/stream.c (next_packet): Rework to fill in a Packet structure
+	as we go, and have it filled from the buffer when the entire packet
+	is in there.  That way nothing passed this has to worry about
+	whether an event was long, short, special or just down-right stupid.
+	(parse_stream_block): Use a Packet struct on the stack to pass
+	to next_packet and down to the handler functions.
+
 	* README: Document the basics of encryption.
 
 	* src/live-f1.h (CurrentState): Add the decryption salt to the

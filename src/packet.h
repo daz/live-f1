@@ -23,32 +23,12 @@
 #include "live-f1.h"
 
 
-/* Which car the packet is for */
-#define PACKET_CAR(_p) ((_p)[0] & 0x1f)
-
-/* Which type of packet it is */
-#define PACKET_TYPE(_p) (((_p)[0] >> 5) | (((_p)[1] & 0x01) << 3))
-
-/* Data from a short packet */
-#define SHORT_PACKET_DATA(_p) (((_p)[1] & 0x0e) >> 1)
-
-/* Data from a special packet */
-#define SPECIAL_PACKET_DATA(_p) ((_p)[1] >> 1)
-
-/* Length of the packet if it's one of the long ones */
-#define LONG_PACKET_LEN(_p) (SPECIAL_PACKET_DATA(_p))
-
-/* Flag for a nominally short packet with no following data */
-#define SHORT_PACKET_EMPTY(_p) (((_p)[1] & 0xf0) == 0xf0)
-
-/* Length of the packet if it's one of the short ones */
-#define SHORT_PACKET_LEN(_p) ((SHORT_PACKET_EMPTY(_p) ? 0 : ((_p)[1] >> 4)))
-
-/* Length of the packet if it's a special one */
-#define SPECIAL_PACKET_LEN(_p) 0
-
-
-/* Types of packets for cars */
+/**
+ * CarPacketType:
+ *
+ * Known types of packets for cars, mostly these consist of a table
+ * cell update with the colour in the data field.
+ **/
 typedef enum {
 	CAR_POSITION_UPDATE,
 	CAR_POSITION,
@@ -58,7 +38,12 @@ typedef enum {
 	CAR_POSITION_HISTORY = 15
 } CarPacketType;
 
-/* Types of non-car packets */
+/**
+ * SystemPacketType:
+ *
+ * Known types of packets that aren't related to cars, covering a wide
+ * range of different formats and data.
+ **/
 typedef enum {
 	SYS_EVENT_ID = 1,
 	SYS_KEY_FRAME,
@@ -73,11 +58,30 @@ typedef enum {
 	SYS_COPYRIGHT
 } SystemPacketType;
 
+/**
+ * Packet:
+ * @car: index of car,
+ * @type: type of packet,
+ * @data: additional data in header,
+ * @len: length of @payload,
+ * @payload: (decrypted) data that followed the packet.
+ *
+ * This is the decoded packet structure, and is slightly easier to deal
+ * with than the binary hideousness from the stream.  The @car index is
+ * not the car's number, but the position on the grid at the start of the
+ * race.
+ **/
+typedef struct {
+	int  car, type, data, len;
+
+	unsigned char payload[128];
+} Packet;
+
 
 SJR_BEGIN_EXTERN
 
-void handle_car_packet    (CurrentState *state, const unsigned char *packet);
-void handle_system_packet (CurrentState *state, const unsigned char *packet);
+void handle_car_packet    (CurrentState *state, const Packet *packet);
+void handle_system_packet (CurrentState *state, const Packet *packet);
 
 SJR_END_EXTERN
 
