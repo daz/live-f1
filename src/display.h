@@ -28,6 +28,7 @@ SJR_BEGIN_EXTERN
 /* Curses display running */
 int cursed;
 
+
 void open_display  (void);
 void close_display (void);
 

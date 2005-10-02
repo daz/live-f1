@@ -54,7 +54,7 @@ typedef enum {
 int cursed = 0;
 
 /* Attributes for the colours */
-int attrs[LAST_COLOUR];
+static int attrs[LAST_COLOUR];
 
 /* Various windows */
 static WINDOW *boardwin = 0;

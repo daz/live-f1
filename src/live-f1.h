@@ -67,6 +67,7 @@ SJR_BEGIN_EXTERN
 /* Program's name */
 const char *program_name;
 
+
 int info (int irrelevance, const char *format, ...);
 
 SJR_END_EXTERN

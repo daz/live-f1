@@ -1,5 +1,10 @@
 2005-10-02  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (attrs): Make static.
+	* src/display.h: Add missing newline between vars and functions.
+	* src/live-f1.h: Add missing newline between vars and functions.
+	* src/packet.c: Correct doc for event_id
+
 	* src/display.c (open_display): Sets up the curses display,
 	allocates colours, etc.
 	(close_display): Tears down the curses environment again.

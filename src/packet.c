@@ -66,7 +66,7 @@ handle_system_packet (CurrentState *state,
 		 * Data: type of event.
 		 *
 		 * Indicates the start of an event, we use this to set up
-		 * the table properly and obtain the decryption key for
+		 * the board properly and obtain the decryption key for
 		 * the event.
 		 */
 	{
