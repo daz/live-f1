@@ -1,5 +1,12 @@
 2005-10-02  Scott James Remnant  <scott@netsplit.com>
 
+	* src/stream.c (SHORT_PACKET_LEN): If the short packet length is
+	0xf0, treat it as -1 and not 0; as 0 is another discreet value.
+	(next_packet): Fix to cope with packet->len being -1, actually
+	makes it a little more efficient for special packets.
+	* src/packet.c (handle_car_packet): Empty the text of the atom
+	if the packet length is zero, keep it if -1.
+
 	* src/live-f1.h (CurrentState): Add fields for current lap,
 	number of cars, position of each car and the last colour and text
 	received for each event type.

@@ -61,7 +61,7 @@
 #define LONG_PACKET_LEN(_p) ((_p)[1] >> 1)
 
 /* Length of the packet if it's one of the short ones */
-#define SHORT_PACKET_LEN(_p) (((_p)[1] & 0xf0) == 0xf0 ? 0 : ((_p)[1] >> 4))
+#define SHORT_PACKET_LEN(_p) (((_p)[1] & 0xf0) == 0xf0 ? -1 : ((_p)[1] >> 4))
 
 /* Length of the packet if it's a special one */
 #define SPECIAL_PACKET_LEN(_p) 0
@@ -267,19 +267,21 @@ next_packet (CurrentState         *state,
 {
 	static unsigned char pbuf[129];
 	static size_t        pbuf_len = 0;
-	size_t               needed;
 	int                  decrypt = 0;
 
 	/* We need a minimum of two bytes to figure out how long the rest
 	 * of it's supposed to be; copy those now if we have room.
 	 */
 	if (pbuf_len < 2) {
+		size_t needed;
+
 		needed = MIN (*buf_len, 2 - pbuf_len);
 		memcpy (pbuf + pbuf_len, *buf, needed);
 
 		pbuf_len += needed;
 		*buf += needed;
 		*buf_len -= needed;
+
 		if (pbuf_len < 2)
 			return 0;
 	}
@@ -359,27 +361,40 @@ next_packet (CurrentState         *state,
 		}
 	}
 
-	/* Copy as much as we can */
-	needed = MIN (*buf_len, (packet->len + 2) - pbuf_len);
-	memcpy (pbuf + pbuf_len, *buf, needed);
+	/* Copy as much as we can of the rest of the packet */
+	if (packet->len > 0) {
+		size_t needed;
 
-	pbuf_len += needed;
-	*buf += needed;
-	*buf_len -= needed;
+		needed = MIN (*buf_len, (packet->len + 2) - pbuf_len);
+		memcpy (pbuf + pbuf_len, *buf, needed);
 
-	/* Copy the payload and decrypt if we have a packet */
-	if (pbuf_len == packet->len + 2) {
+		pbuf_len += needed;
+		*buf += needed;
+		*buf_len -= needed;
+
+		if (pbuf_len < (packet->len + 2))
+			return 0;
+	}
+
+	/* We have a full packet, reset our static cache length so we
+	 * can re-use it for the next packet (which might happen before
+	 * this one has finished being handled when key frames are being
+	 * fetched).
+	 */
+	pbuf_len = 0;
+
+	/* Copy the payload and decrypt it */
+	if (packet->len > 0) {
 		memcpy (packet->payload, pbuf + 2, packet->len);
 		packet->payload[packet->len] = 0;
 
 		if (decrypt)
 			decrypt_bytes (state, packet->payload, packet->len);
-
-		pbuf_len = 0;
-		return 1;
 	} else {
-		return 0;
+		packet->payload[0] = 0;
 	}
+
+	return 1;
 }
 
 /**

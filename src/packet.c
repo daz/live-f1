@@ -93,7 +93,7 @@ handle_car_packet (CurrentState *state,
 
 		atom = &state->car_info[packet->car - 1][packet->type];
 		atom->data = packet->data;
-		if (packet->len)
+		if (packet->len >= 0)
 			strcpy (atom->text, (const char *) packet->payload);
 
 		update_cell (state, packet->car, packet->type);
