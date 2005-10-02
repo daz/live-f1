@@ -29,6 +29,7 @@
 #include <ne_socket.h>
 
 #include "live-f1.h"
+#include "display.h"
 #include "http.h"
 #include "stream.h"
 
@@ -78,6 +79,8 @@ main (int   argc,
 	while (read_stream (&state, sock) > 0)
 		;
 
+	close_display ();
+
 	return 0;
 }
 
@@ -99,9 +102,16 @@ info (int         irrelevance,
 
 	if (verbosity >= irrelevance) {
 		va_start (ap, format);
-		ret = vprintf (format, ap);
-		va_end (ap);
+		if (cursed) {
+			unsigned char msg[513];
 
+			ret = vsnprintf ((char *) msg, 512, format, ap);
+			popup_message (msg);
+		} else {
+			ret = vprintf (format, ap);
+		}
+
+		va_end (ap);
 		return ret;
 	} else {
 		return 0;

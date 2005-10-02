@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include "live-f1.h"
+#include "display.h"
 #include "http.h"
 #include "stream.h"
 #include "packet.h"
@@ -81,6 +82,7 @@ handle_system_packet (CurrentState *state,
 		state->event_type = packet->data;
 		reset_decryption (state);
 
+		clear_board (state);
 		info (3, _("Begin new event #%d (type: %d)\n"),
 		      state->event_no, state->event_type);
 		break;
@@ -119,18 +121,8 @@ handle_system_packet (CurrentState *state,
 		 *
 		 * Plain text copyright notice in the start of the feed.
 		 */
-	{
-		char *message;
-
-		message = malloc (packet->len + 1);
-		strncpy (message, (char *)packet->payload, packet->len);
-		message[packet->len] = 0;
-
-		info (2, "%s\n", message);
-
-		free(message);
+		info (2, "%s\n", packet->payload);
 		break;
-	}
 	case SYS_NOTICE:
 		/* Important System Notice
 		 * Format: string
@@ -138,18 +130,8 @@ handle_system_packet (CurrentState *state,
 		 * Various important system notices get displayed this
 		 * way.
 		 */
-	{
-		char *message;
-
-		message = malloc (packet->len + 1);
-		strncpy (message, (char *)packet->payload, packet->len);
-		message[packet->len] = 0;
-
-		info (0, "%s\n", message);
-
-		free(message);
+		info (0, "%s\n", packet->payload);
 		break;
-	}
 	default:
 		/*
 		printf ("Unhandled system packet:\n");

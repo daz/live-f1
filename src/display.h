@@ -17,22 +17,25 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_STREAM_H
-#define LIVE_F1_STREAM_H
+#ifndef LIVE_F1_DISPLAY_H
+#define LIVE_F1_DISPLAY_H
 
 #include "live-f1.h"
 
 
 SJR_BEGIN_EXTERN
 
-int  open_stream        (const char *hostname, unsigned int port);
-int  read_stream        (CurrentState *state, int sock);
-void parse_stream_block (CurrentState *state, const unsigned char *buf,
-			 size_t buf_len);
+/* Curses display running */
+int cursed;
 
-void reset_decryption   (CurrentState *state);
-void decrypt_bytes      (CurrentState *state, unsigned char *buf, size_t len);
+void open_display  (void);
+void close_display (void);
+
+void clear_board   (CurrentState *state);
+
+void popup_message (const unsigned char *message);
+void close_popup   (void);
 
 SJR_END_EXTERN
 
-#endif /* LIVE_F1_STREAM_H */
+#endif /* LIVE_F1_DISPLAY_H */

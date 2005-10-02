@@ -87,6 +87,8 @@ obtain_auth_cookie (const char *email,
 
 	info (1, _("Obtaining authentication cookie ...\n"));
 
+	return "yes there is a cookie";
+
 	/* Encode the e-mail and password as a form */
 	e_email = ne_path_escape (email);
 	e_password = ne_path_escape (password);
@@ -175,6 +177,7 @@ obtain_decryption_key (unsigned int  event_no,
 	unsigned int  key = 0;
 
 	info (1, _("Obtaining decryption key ...\n"));
+	return 0xd63c09f4;
 
 	url = malloc (strlen (KEY_URL_BASE) + numlen (event_no)
 		      + strlen (cookie) + 11);

@@ -22,6 +22,7 @@ PKG_CHECK_MODULES([NEON], [neon >= 0.24.0])
 # Checks for typedefs, structures, and compiler characteristics.
 
 # Checks for library functions.
+AC_CHECK_LIB([ncurses], [initscr])
 
 # Other checks
 SJR_COMPILER_WARNINGS

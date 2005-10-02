@@ -1,3 +1,27 @@
+2005-10-02  Scott James Remnant  <scott@netsplit.com>
+
+	* src/display.c (open_display): Sets up the curses display,
+	allocates colours, etc.
+	(close_display): Tears down the curses environment again.
+	(clear_board): Place holder function, will be used to clear the
+	board at the start of an event; for now just schedules a window
+	update with some cruft in it.
+	(popup_message): Displays a popup message in front of everything
+	else on the screen, with some evil window hackery.
+	(close_popup): Takes the popup away again and makes sure it'll
+	really vanish at the next update.
+	* src/stream.c (next_packet): Null-terminate the payload for free
+	to make dealing with strings marginally less painful.
+	* src/stream.h: Fix bogus prototypes.
+	* configure.ac: Add check for ncurses library.
+	* src/display.h: Header file.
+	* src/main.c (main): Close curses display on shutdown.
+	(info): use popup_message when curses is running.
+	* src/packet.c (handle_system_packet): Clear the board at the
+	start of an event (opening curses display).  Take away the
+	null-terminate code now they always are.
+	* src/Makefile.am (live_f1_SOURCES): Add display.c and display.h.
+
 2005-10-01  Scott James Remnant  <scott@netsplit.com>
 
 	* src/packet.c (handle_system_packet): Add handling for

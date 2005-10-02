@@ -370,6 +370,8 @@ next_packet (CurrentState         *state,
 	/* Copy the payload and decrypt if we have a packet */
 	if (pbuf_len == packet->len + 2) {
 		memcpy (packet->payload, pbuf + 2, packet->len);
+		packet->payload[packet->len] = 0;
+
 		if (decrypt)
 			decrypt_bytes (state, packet->payload, packet->len);
 
