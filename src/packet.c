@@ -24,7 +24,6 @@
 #endif /* HAVE_CONFIG_H */
 
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -46,6 +45,64 @@ void
 handle_car_packet (CurrentState *state,
 		   const Packet *packet)
 {
+	/* Check whether a new car joined the event; actually, this is
+	 * because we never know in advance how many cars there are, and
+	 * things like practice sessions can probably have more than the
+	 * usual twenty.  (Or we might get another team in the future).
+	 *
+	 * Then increase the size of all the arrays and clear the board.
+	 */
+	if (packet->car > state->num_cars) {
+		int i;
+
+		state->car_position = realloc (state->car_position,
+					       sizeof (int) * packet->car);
+		state->car_info = realloc (state->car_info,
+					   sizeof (CarAtom *) * packet->car);
+
+		for (i = state->num_cars; i < packet->car; i++) {
+			state->car_info[i] = malloc (sizeof (CarAtom)
+						     * LAST_CAR_PACKET);
+			memset (state->car_info[i], 0, sizeof (CarAtom));
+		}
+
+		state->num_cars = packet->car;
+		clear_board (state);
+	}
+
+	switch ((CarPacketType) packet->type) {
+	case CAR_POSITION:
+	case CAR_NUMBER:
+	case CAR_DRIVER:
+	case CAR_GAP:
+	case CAR_INTERVAL:
+	case CAR_LAP_TIME:
+	case CAR_SECTOR_1:
+	case CAR_SECTOR_2:
+	case CAR_SECTOR_3:
+	case CAR_NUM_PITS: {
+		/* Car Data Atom:
+		 * Format: string.
+		 * Data: colour.
+		 *
+		 * Each of these events updates a particular piece of data
+		 * for the car, some (with no length) only update the colour
+		 * of a field.
+		 */
+		CarAtom *atom;
+
+		atom = &state->car_info[packet->car - 1][packet->type];
+		atom->data = packet->data;
+		if (packet->len)
+			strcpy (atom->text, (const char *) packet->payload);
+
+		update_cell (state, packet->car, packet->type);
+		break;
+	}
+	default:
+		/* Unhandled packet */
+		break;
+	}
 }
 
 /**
@@ -80,6 +137,16 @@ handle_system_packet (CurrentState *state,
 		state->key = obtain_decryption_key (event_no, state->cookie);
 		state->event_no = event_no;
 		state->event_type = packet->data;
+		state->lap = 0;
+		state->num_cars = 0;
+		if (state->car_position) {
+			free (state->car_position);
+			state->car_position = NULL;
+		}
+		if (state->car_info) {
+			free (state->car_info);
+			state->car_info = NULL;
+		}
 		reset_decryption (state);
 
 		clear_board (state);
@@ -88,7 +155,7 @@ handle_system_packet (CurrentState *state,
 		break;
 	}
 	case SYS_KEY_FRAME:
-		/* Key Frame Marker.
+		/* Key Frame Marker:
 		 * Format: little-endian integer.
 		 *
 		 * If we've not yet encountered a key frame, we need to
@@ -116,16 +183,16 @@ handle_system_packet (CurrentState *state,
 		break;
 	}
 	case SYS_COPYRIGHT:
-		/* Copyright Notice
-		 * Format: string
+		/* Copyright Notice:
+		 * Format: string.
 		 *
 		 * Plain text copyright notice in the start of the feed.
 		 */
 		info (2, "%s\n", packet->payload);
 		break;
 	case SYS_NOTICE:
-		/* Important System Notice
-		 * Format: string
+		/* Important System Notice:
+		 * Format: string.
 		 *
 		 * Various important system notices get displayed this
 		 * way.
@@ -133,22 +200,7 @@ handle_system_packet (CurrentState *state,
 		info (0, "%s\n", packet->payload);
 		break;
 	default:
-		/*
-		printf ("Unhandled system packet:\n");
-		printf ("    type: %d\n", packet->type);
-		printf ("    data: %d\n", packet->data);
-		printf ("    len: %d\n", packet->len);
-		printf ("    payload: ");
-		{
-			int i;
-			for (i = 0; i < packet->len; i++)
-				if (packet->payload[i] > ' ' && packet->payload[i] <= '~')
-					printf ("%c", packet->payload[i]);
-			        else
-					printf (".");
-		}
-		printf ("\n");
-		*/
+		/* Unhandled event */
 		break;
 	}
 }

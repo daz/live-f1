@@ -110,7 +110,7 @@ open_stream (const char   *hostname,
 
 	sock = -1;
 	for (addr = res; addr; addr = addr->ai_next) {
-		info(3, _("Trying %s ...\n"), addr->ai_canonname);
+		info (3, _("Trying %s ...\n"), addr->ai_canonname);
 
 		sock = socket (addr->ai_family, addr->ai_socktype,
 			       addr->ai_protocol);
@@ -338,8 +338,8 @@ next_packet (CurrentState         *state,
 			decrypt = 1;
 			break;
 		case SYS_UNKNOWN_LONG_A:
+		case SYS_UNKNOWN_LONG_B:
 		case SYS_NOTICE:
-		case SYS_UNKNOWN_LONG_C:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 1;

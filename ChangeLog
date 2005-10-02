@@ -1,5 +1,42 @@
 2005-10-02  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (CurrentState): Add fields for current lap,
+	number of cars, position of each car and the last colour and text
+	received for each event type.
+	(CarAtom): Structure to pair the colour and text for each cell.
+	* src/packet.c (handle_car_packet): When a car event comes in,
+	check we have room for it, and if not expand our information arrays
+	to compensate.  If it's one with an associated atom, copy the data
+	into it overwriting anything there before (except text if none
+	came in the event) and update the cell on the board.
+	(handle_system_packet): Reset the lap counter, number of cars and
+	car information when a new event starts.
+	* src/packet.h (CarPacketType): Add the set of packet types for
+	a race, still a handful that I don't know what they're for.
+	Add LAST_CAR_PACKET for counting.
+	(SystemPacketType): Rename SYS_UNKNOWN_LONG_C to B for clarity;
+	add LAST_SYSTEM_PACKET for counting.
+	* src/display.c (open_display): Brock no delay when peeking for
+	key presses.
+	(close_display): Don't bother waiting for a key if a popup is open,
+	just quit.
+	(clear_board): Don't draw a box around the board, and instead of
+	filling it with junk, output proper headers (for race) and the
+	current information from the state structure.
+	(should_quit): Function to check the keyboard to see whether the user
+	is trying to quit.
+	(cell_info): One shot function to convert an atom of information
+	into a screen position, attributes and text.
+	(update_cell): Updates an individual cell on the board, opening the
+	display if necessary and updating it when done.
+	(popup_message): Change to not be unsigned, no point.
+	* src/display.h: Update.
+	* src/main.c (main): Quit if the user presses the right key.
+	Close the socket on our way out, just to be tidy.  After clearing
+	the state structure, set the pointers to NULL to be safe.
+	(info): Update to not pass unsigned stuff to info, use sizeof for
+	message buffer.	
+
 	* src/display.c (attrs): Make static.
 	* src/display.h: Add missing newline between vars and functions.
 	* src/live-f1.h: Add missing newline between vars and functions.

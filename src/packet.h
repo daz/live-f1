@@ -34,8 +34,19 @@ typedef enum {
 	CAR_POSITION,
 	CAR_NUMBER,
 	CAR_DRIVER,
-	/* Everything else is short */
-	CAR_POSITION_HISTORY = 15
+	CAR_GAP,
+	CAR_INTERVAL,
+	CAR_LAP_TIME,
+	CAR_SECTOR_1,
+	CAR_UNKNOWN_1,
+	CAR_SECTOR_2,
+	CAR_UNKNOWN_2,
+	CAR_SECTOR_3,
+	CAR_UNKNOWN_3,
+	CAR_NUM_PITS,
+	CAR_UNKNOWN_0,
+	CAR_POSITION_HISTORY,
+	LAST_CAR_PACKET
 } CarPacketType;
 
 /**
@@ -53,9 +64,10 @@ typedef enum {
 	SYS_NOTICE,
 	SYS_STRANGE_A, /* Always two bytes */
 	SYS_UNKNOWN_SHORT_A = 9,
-	SYS_UNKNOWN_LONG_C,
+	SYS_UNKNOWN_LONG_B,
 	SYS_UNKNOWN_SHORT_B,
-	SYS_COPYRIGHT
+	SYS_COPYRIGHT,
+	LAST_SYSTEM_PACKET
 } SystemPacketType;
 
 /**
@@ -72,7 +84,7 @@ typedef enum {
  * race.
  **/
 typedef struct {
-	int  car, type, data, len;
+	int car, type, data, len;
 
 	unsigned char payload[128];
 } Packet;

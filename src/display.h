@@ -21,6 +21,7 @@
 #define LIVE_F1_DISPLAY_H
 
 #include "live-f1.h"
+#include "packet.h"
 
 
 SJR_BEGIN_EXTERN
@@ -31,10 +32,12 @@ int cursed;
 
 void open_display  (void);
 void close_display (void);
+int  should_quit   (void);
 
 void clear_board   (CurrentState *state);
+void update_cell   (CurrentState *state, int car, CarPacketType type);
 
-void popup_message (const unsigned char *message);
+void popup_message (const char *message);
 void close_popup   (void);
 
 SJR_END_EXTERN

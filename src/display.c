@@ -26,10 +26,10 @@
 
 #include <stdlib.h>
 #include <string.h>
-
 #include <curses.h>
 
 #include "live-f1.h"
+#include "packet.h" /* for packet type */
 #include "display.h"
 
 
@@ -47,7 +47,13 @@ typedef enum {
 	COLOUR_OLD,
 	COLOUR_POPUP,
 	LAST_COLOUR
-} Colours;
+} TextColour;
+
+
+/* Forward prototypes */
+static int cell_info (CurrentState *state, int car, CarPacketType type,
+		      int *y, int *x, int *sz, int *attr,
+		      const char **text);
 
 
 /* Curses display running */
@@ -80,6 +86,7 @@ open_display (void)
 	nonl ();
 	intrflush (stdscr, FALSE);
 	keypad (stdscr, TRUE);
+	nodelay (stdscr, TRUE);
 
 	if (start_color () || (COLOR_PAIRS < LAST_COLOUR)) {
 		/* Black and white */
@@ -119,6 +126,102 @@ open_display (void)
 }
 
 /**
+ * cell_info:
+ * @state: application state structure,
+ * @car: car number,
+ * @type: atom type,
+ * @y: pointer to fill with cell row,
+ * @x: pointer to fill with cell column,
+ * @sz: pointer to fill with size of cell,
+ * @attr: pointer to fill with cell attributes,
+ * @text: pointer to fill with cell text.
+ *
+ * Works out where on the board to place the atom of information
+ * referenced and in which colour, etc.
+ *
+ * Returns: 1 if atom should be placed on the board, 0 if not.
+ **/
+static int
+cell_info (CurrentState  *state,
+	   int            car,
+	   CarPacketType  type,
+	   int           *y,
+	   int           *x,
+	   int           *sz,
+	   int           *attr,
+	   const char   **text)
+{
+	CarAtom *atom;
+
+	if (! car)
+		return 0;
+	*y = car;
+
+	switch (type) {
+	case CAR_POSITION:
+		*x = 0;
+		*sz = 2;
+		break;
+	case CAR_NUMBER:
+		*x = 3;
+		*sz = 2;
+		break;
+	case CAR_DRIVER:
+		*x = 6;
+		*sz = 14;
+		break;
+	case CAR_GAP:
+		*x = 21;
+		*sz = 4;
+		break;
+	case CAR_INTERVAL:
+		*x = 26;
+		*sz = 4;
+		break;
+	case CAR_LAP_TIME:
+		*x = 31;
+		*sz = 8;
+		break;
+	case CAR_SECTOR_1:
+		*x = 40;
+		*sz = 4;
+		break;
+	case CAR_SECTOR_2:
+		*x = 45;
+		*sz = 4;
+		break;
+	case CAR_SECTOR_3:
+		*x = 50;
+		*sz = 4;
+		break;
+	case CAR_NUM_PITS:
+		*x = 55;
+		*sz = 3;
+		break;
+	default:
+		return 0;
+	}
+
+	atom = &state->car_info[car - 1][type];
+
+	/* Check the colour is valid */
+	if (atom->data < COLOUR_POPUP) {
+		*attr = attrs[atom->data];
+	} else {
+		return 0;
+	}
+
+	/* Check for over-long atoms */
+	if (strlen ((const char *) atom->text) <= *sz) {
+		*text = atom->text;
+	} else {
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
  * clear_board;
  * @state: application state structure.
  *
@@ -134,31 +237,52 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	boardwin = newwin (22, 60, 0, 0);
+	boardwin = newwin (21, 58, 0, 0);
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
-	box (boardwin, 0, 0);
 
-	mvwaddstr(boardwin, 1, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 2, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 3, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 4, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 5, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 6, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 7, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 8, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin, 9, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,10, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,11, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,12, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,13, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,14, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,15, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,16, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,17, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,18, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,19, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
-	mvwaddstr(boardwin,20, 1, " P    Name            Gap  Int Time     Sec1 Sec2 Sec3 Pit");
+	mvwprintw (boardwin, 0, 0,
+		   "%2s %2s %-14s %4s %4s %-8s %4s %4s %4s %3s",
+		   _("P"), _(""), _("Name"), _("Gap"), _("Int"), _("Time"),
+		   _("Sec1"), _("Sec2"), _("Sec3"), _("Pit"));
+
+	/* FIXME current information without an update */
+
+	wnoutrefresh (boardwin);
+	doupdate ();
+}
+
+/**
+ * update_cell:
+ * @state: application state structure,
+ * @car: car number to update,
+ * @type: atom to update.
+ *
+ * Update a particular cell on the board, with the necessary information
+ * available in the state structure.  Intended for external code as it
+ * updates the display when done.
+ **/
+void
+update_cell (CurrentState  *state,
+	     int            car,
+	     CarPacketType  type)
+{
+	int         y, x, sz, attr;
+	const char *text;
+
+	if (!cursed)
+		clear_board (state);
+	close_popup ();
+
+	if (! cell_info (state, car, type, &y, &x, &sz, &attr, &text))
+		return;
+
+	wattrset (boardwin, attr);
+	wmove (boardwin, y, x);
+	while (sz--)
+		waddch (boardwin, ' ');
+
+	mvwaddstr (boardwin, y, x, (const char *) text);
 
 	wnoutrefresh (boardwin);
 	doupdate ();
@@ -175,16 +299,41 @@ close_display (void)
 	if (! cursed)
 		return;
 
-	if (popupwin) {
-		wgetch (popupwin);
+	if (popupwin)
 		delwin (popupwin);
-	}
 	if (boardwin)
 		delwin (boardwin);
 
 	endwin ();
 
 	cursed = 0;
+}
+
+/**
+ * should_quit:
+ *
+ * Checks for a key press on the keyboard matching any key we quit for
+ * (Enter, Escape, q, etc.).
+ *
+ * Returns: 0 if none were pressed, 1 if one was.
+ **/
+int
+should_quit (void)
+{
+	if (! cursed)
+		return 0;
+
+	switch (getch ()) {
+	case KEY_ENTER:
+	case '\r':
+	case '\n':
+	case 0x1b: /* Escape */
+	case 'q':
+	case 'Q':
+		return 1;
+	default:
+		return 0;
+	}
 }
 
 /**
@@ -195,19 +344,17 @@ close_display (void)
  * done.  This can be dismisssed by calling close_popup().
  **/
 void
-popup_message (const unsigned char *message)
+popup_message (const char *message)
 {
-	unsigned char *msg;
-	size_t         msglen;
-	int            nlines, ncols, col, ls, i;
+	char  *msg;
+	size_t msglen;
+	int    nlines, ncols, col, ls, i;
 
 	open_display ();
 	close_popup ();
 
-
-	msglen = strlen ((char *) message);
-	msg = malloc (msglen + 1);
-	strcpy ((char *) msg, (const char *) message);
+	msg = strdup (message);
+	msglen = strlen (msg);
 	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
 		msg[--msglen] = 0;
 

@@ -41,6 +41,21 @@ typedef enum {
 	/* Don't know any of the others yet */
 } EventType;
 
+
+/**
+ * CarAtom:
+ * @data: data associated with atom,
+ * @text: content of atom.
+ *
+ * Used to hold the current information about a car, there is one CarAtom
+ * for each car for each possible packet type that can be received from
+ * the server.
+ **/
+typedef struct {
+	int  data;
+	char text[16];
+} CarAtom;
+
 /**
  * CurrentState:
  * @cookie: user's authorisation cookie,
@@ -48,17 +63,27 @@ typedef enum {
  * @salt: current decryption salt,
  * @frame: last seen key frame,
  * @event_no: event number,
- * @event_type: event type.
+ * @event_type: event type,
+ * @lap: current lap,
+ * @num_cars: number of cars in the event,
+ * @car_position: current position of car,
+ * @car_info: arrays of information about each car.
  *
  * Holds the current application state so we don't need to pass around
  * a lot of variables or keep them globally.
  **/
 typedef struct {
-	char         *cookie;
-	unsigned int  key, salt;
-	unsigned int  frame;
-	unsigned int  event_no;
-	EventType     event_type;
+	char          *cookie;
+	unsigned int   key, salt;
+	unsigned int   frame;
+
+	unsigned int   event_no;
+	EventType      event_type;
+	unsigned int   lap;
+
+	int            num_cars;
+	int           *car_position;
+	CarAtom      **car_info;
 } CurrentState;
 
 

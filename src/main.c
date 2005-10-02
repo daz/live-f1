@@ -25,6 +25,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <locale.h>
+#include <unistd.h>
 
 #include <ne_socket.h>
 
@@ -38,7 +39,7 @@
 const char *program_name = NULL;
 
 /* How verbose to be */
-static int verbosity = 10;
+static int verbosity = 3;
 
 
 int
@@ -61,6 +62,10 @@ main (int   argc,
 	}
 
 	memset (&state, 0, sizeof (state));
+	state.cookie = NULL;
+	state.car_position = NULL;
+	state.car_info = NULL;
+
 	reset_decryption (&state);
 
 	state.cookie = obtain_auth_cookie ("scott-fia@netsplit.com",
@@ -76,10 +81,13 @@ main (int   argc,
 		return 1;
 	}
 
-	while (read_stream (&state, sock) > 0)
-		;
+	while (read_stream (&state, sock) > 0) {
+		if (should_quit ())
+			break;
+	}
 
 	close_display ();
+	close (sock);
 
 	return 0;
 }
@@ -103,9 +111,11 @@ info (int         irrelevance,
 	if (verbosity >= irrelevance) {
 		va_start (ap, format);
 		if (cursed) {
-			unsigned char msg[513];
+			char msg[512];
 
-			ret = vsnprintf ((char *) msg, 512, format, ap);
+			ret = vsnprintf (msg, sizeof (msg), format, ap);
+			msg[sizeof (msg)] = 0;
+
 			popup_message (msg);
 		} else {
 			ret = vprintf (format, ap);
