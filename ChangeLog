@@ -1,3 +1,10 @@
+2005-10-03  Scott James Remnant  <scott@netsplit.com>
+
+	* src/main.c (print_version): Prints out the standard name,
+	version, copyright and licence preamble.
+	(main): Print the version every time we start, like a well
+	behaved GNU program.
+
 2005-10-02  Scott James Remnant  <scott@netsplit.com>
 
 	* src/stream.c (SHORT_PACKET_LEN): If the short packet length is

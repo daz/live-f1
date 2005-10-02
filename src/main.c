@@ -35,6 +35,10 @@
 #include "stream.h"
 
 
+/* Forward prototypes */
+static void print_version (void);
+
+
 /* Program name */
 const char *program_name = NULL;
 
@@ -54,6 +58,8 @@ main (int   argc,
 	textdomain (PACKAGE);
 
 	program_name = argv[0];
+
+	print_version ();
 
 	if (ne_sock_init ()) {
 		fprintf (stderr, "%s: %s\n", program_name,
@@ -75,7 +81,7 @@ main (int   argc,
 		return 1;
 	}
 
-	sock = open_stream ("localhost", 4321);
+	sock = open_stream ("syndicate.netsplit.com", 4321);
 	if (sock < 0) {
 		printf ("Unable to open data stream.\n");
 		return 1;
@@ -126,4 +132,23 @@ info (int         irrelevance,
 	} else {
 		return 0;
 	}
+}
+
+
+/**
+ * print_version:
+ *
+ * Print the package name, version, copyright and licence preamble to
+ * standard output.
+ **/
+static void
+print_version (void)
+{
+	printf ("%s\n", PACKAGE_STRING);
+	printf ("Copyright (C) 2005 Scott James Remnant <scott@netsplit.com>.\n");
+	printf ("\n");
+	printf (_("This is free software, covered by the GNU General Public License; see the\n"
+		  "source for the copying conditions.  There is NO warranty; not even for\n"
+		  "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"));
+	printf ("\n");
 }
