@@ -280,7 +280,11 @@ _update_cell (CurrentState  *state,
 	pad = sz - len;
 
 	wmove (boardwin, y, x);
-	wattrset (boardwin, attr);
+	if (len) {
+		wattrset (boardwin, attr);
+	} else {
+		wattrset (boardwin, attrs[COLOUR_DEFAULT]);
+	}
 
 	while ((align > 0) && pad--)
 		waddch (boardwin, ' ');

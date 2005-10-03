@@ -2,6 +2,8 @@
 
 	* src/display.c (clear_board): Bail out if we end up on a display
 	that's too small for us.
+	(_update_cell): Always write spaces in the default colour, to let
+	us play with colours a bit more if we want.
 
 	* src/packet.h (CarPacketType): The three inter-sector unknowns
 	appear to be the lap the car stopped (if between S1 and S2),
