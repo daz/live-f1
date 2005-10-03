@@ -141,7 +141,21 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	boardwin = newwin (MIN (21, state->num_cars + 1), 69, 0, 0);
+	i = MIN (21, state->num_cars + 1);
+	if (LINES < i) {
+		close_display ();
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("insufficient lines on display"));
+		exit (10);
+	}
+	if (COLS < 69) {
+		close_display ();
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("insufficient columns on display"));
+		exit (10);
+	}
+
+	boardwin = newwin (i, 69, 0, 0);
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
 

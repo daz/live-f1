@@ -1,5 +1,8 @@
 2005-10-03  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (clear_board): Bail out if we end up on a display
+	that's too small for us.
+
 	* src/packet.h (CarPacketType): The three inter-sector unknowns
 	appear to be the lap the car stopped (if between S1 and S2),
 	the lap the car entered the pits and the lap the car left the pits;
