@@ -1,5 +1,9 @@
 2005-10-03  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (_update_cell): Add an alignment option to each
+	field, either left (-1) or right (1).  Use this when outputting
+	the text to line things up.
+
 	* src/display.c (update_car): Updates an entire row of car
 	information, used when cars change positions, etc.
 	(update_cell): Take out the bulk of the real code from here,

@@ -174,9 +174,10 @@ _update_cell (CurrentState  *state,
 	      int            car,
 	      CarPacketType  type)
 {
-	int         y, x, sz, attr;
+	int         y, x, sz, align, attr;
 	CarAtom    *atom;
 	const char *text;
+	size_t      len, pad;
 
 	y = state->car_position[car - 1];
 	if (! y)
@@ -186,42 +187,52 @@ _update_cell (CurrentState  *state,
 	case CAR_POSITION:
 		x = 0;
 		sz = 2;
+		align = 1;
 		break;
 	case CAR_NUMBER:
 		x = 3;
 		sz = 2;
+		align = 1;
 		break;
 	case CAR_DRIVER:
 		x = 6;
 		sz = 14;
+		align = -1;
 		break;
 	case CAR_GAP:
 		x = 21;
 		sz = 4;
+		align = 1;
 		break;
 	case CAR_INTERVAL:
 		x = 26;
 		sz = 4;
+		align = 1;
 		break;
 	case CAR_LAP_TIME:
 		x = 31;
 		sz = 8;
+		align = -1;
 		break;
 	case CAR_SECTOR_1:
 		x = 40;
 		sz = 4;
+		align = 1;
 		break;
 	case CAR_SECTOR_2:
 		x = 45;
 		sz = 4;
+		align = 1;
 		break;
 	case CAR_SECTOR_3:
 		x = 50;
 		sz = 4;
+		align = 1;
 		break;
 	case CAR_NUM_PITS:
 		x = 55;
 		sz = 3;
+		align = -1;
 		break;
 	default:
 		return;
@@ -229,19 +240,24 @@ _update_cell (CurrentState  *state,
 
 	atom = &state->car_info[car - 1][type];
 	attr = attrs[atom->data];
+	text = atom->text;
+	len = strlen ((const char *) text);
 
 	/* Check for over-long atoms */
-	if (strlen ((const char *) atom->text) <= sz) {
-		text = atom->text;
-	} else {
+	if (len > sz) {
 		text = "";
+		len = 0;
 	}
+	pad = sz - len;
 
 	wmove (boardwin, y, x);
 	wattrset (boardwin, attr);
 
-	while (sz--)
-		waddch (boardwin, (*text ? *(text++) : ' '));
+	while ((align > 0) && pad--)
+		waddch (boardwin, ' ');
+	waddstr (boardwin, text);
+	while ((align < 0) && pad--)
+		waddch (boardwin, ' ');
 }
 
 /**
