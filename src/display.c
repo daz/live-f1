@@ -141,14 +141,14 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	boardwin = newwin (21, 58, 0, 0);
+	boardwin = newwin (MIN (21, state->num_cars + 1), 69, 0, 0);
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
 
 	mvwprintw (boardwin, 0, 0,
-		   "%2s %2s %-14s %4s %4s %-8s %4s %4s %4s %3s",
+		   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
 		   _("P"), _(""), _("Name"), _("Gap"), _("Int"), _("Time"),
-		   _("Sec1"), _("Sec2"), _("Sec3"), _("Pit"));
+		   _("Sector 1"), _("Sector 2"), _("Sector 3"), _("Ps"));
 
 	for (i = 1; i <= state->num_cars; i++) {
 		for (j = 0; j < LAST_CAR_PACKET; j++)
@@ -219,20 +219,35 @@ _update_cell (CurrentState  *state,
 		sz = 4;
 		align = 1;
 		break;
-	case CAR_SECTOR_2:
+	case CAR_LAP_STOP:
 		x = 45;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_SECTOR_3:
-		x = 50;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_NUM_PITS:
-		x = 55;
 		sz = 3;
 		align = -1;
+		break;
+	case CAR_SECTOR_2:
+		x = 49;
+		sz = 4;
+		align = 1;
+		break;
+	case CAR_LAP_IN_PIT:
+		x = 54;
+		sz = 3;
+		align = -1;
+		break;
+	case CAR_SECTOR_3:
+		x = 58;
+		sz = 4;
+		align = 1;
+		break;
+	case CAR_LAP_OUT:
+		x = 63;
+		sz = 3;
+		align = -1;
+		break;
+	case CAR_NUM_PITS:
+		x = 67;
+		sz = 2;
+		align = 1;
 		break;
 	default:
 		return;

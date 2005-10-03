@@ -81,8 +81,11 @@ handle_car_packet (CurrentState *state,
 	case CAR_INTERVAL:
 	case CAR_LAP_TIME:
 	case CAR_SECTOR_1:
+	case CAR_LAP_STOP:
 	case CAR_SECTOR_2:
+	case CAR_LAP_IN_PIT:
 	case CAR_SECTOR_3:
+	case CAR_LAP_OUT:
 	case CAR_NUM_PITS: {
 		/* Data Atom:
 		 * Format: string.

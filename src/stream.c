@@ -305,12 +305,12 @@ next_packet (CurrentState         *state,
 		case CAR_INTERVAL:
 		case CAR_LAP_TIME:
 		case CAR_SECTOR_1:
+		case CAR_LAP_STOP:
 		case CAR_SECTOR_2:
+		case CAR_LAP_IN_PIT:
 		case CAR_SECTOR_3:
+		case CAR_LAP_OUT:
 		case CAR_NUM_PITS:
-		case CAR_UNKNOWN_1:
-		case CAR_UNKNOWN_2:
-		case CAR_UNKNOWN_3:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 1;

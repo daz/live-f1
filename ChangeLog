@@ -1,5 +1,20 @@
 2005-10-03  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h (CarPacketType): The three inter-sector unknowns
+	appear to be the lap the car stopped (if between S1 and S2),
+	the lap the car entered the pits and the lap the car left the pits;
+	I assume these have some meaning, so we may as well display them.
+	* src/packet.c (handle_car_packet): Handle the new CAR_LAP_STOP,
+	CAR_LAP_IN_PIT and CAR_LAP_OUT packets as ordinary atoms.
+	* src/display.c (clear_board): Add 4 columns to each sector header
+	and left-align them.  Decrease the pit count by one to claw back
+	some space.  Increase the window height if we have more than 20
+	drivers, but always allocate at least that.
+	(_update_cell): Add the new atom types, adjust the positions of
+	the following columns to match, decrease pits to two characters
+	and right-align.
+	* src/stream.c (next_packet): Use the new names for the unknowns.
+
 	* src/display.c (_update_cell): Add an alignment option to each
 	field, either left (-1) or right (1).  Use this when outputting
 	the text to line things up.
