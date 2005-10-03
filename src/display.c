@@ -51,9 +51,7 @@ typedef enum {
 
 
 /* Forward prototypes */
-static int cell_info (CurrentState *state, int car, CarPacketType type,
-		      int *y, int *x, int *sz, int *attr,
-		      const char **text);
+static void _update_cell (CurrentState *state, int car, CarPacketType type);
 
 
 /* Curses display running */
@@ -126,102 +124,6 @@ open_display (void)
 }
 
 /**
- * cell_info:
- * @state: application state structure,
- * @car: car number,
- * @type: atom type,
- * @y: pointer to fill with cell row,
- * @x: pointer to fill with cell column,
- * @sz: pointer to fill with size of cell,
- * @attr: pointer to fill with cell attributes,
- * @text: pointer to fill with cell text.
- *
- * Works out where on the board to place the atom of information
- * referenced and in which colour, etc.
- *
- * Returns: 1 if atom should be placed on the board, 0 if not.
- **/
-static int
-cell_info (CurrentState  *state,
-	   int            car,
-	   CarPacketType  type,
-	   int           *y,
-	   int           *x,
-	   int           *sz,
-	   int           *attr,
-	   const char   **text)
-{
-	CarAtom *atom;
-
-	if (! car)
-		return 0;
-	*y = car;
-
-	switch (type) {
-	case CAR_POSITION:
-		*x = 0;
-		*sz = 2;
-		break;
-	case CAR_NUMBER:
-		*x = 3;
-		*sz = 2;
-		break;
-	case CAR_DRIVER:
-		*x = 6;
-		*sz = 14;
-		break;
-	case CAR_GAP:
-		*x = 21;
-		*sz = 4;
-		break;
-	case CAR_INTERVAL:
-		*x = 26;
-		*sz = 4;
-		break;
-	case CAR_LAP_TIME:
-		*x = 31;
-		*sz = 8;
-		break;
-	case CAR_SECTOR_1:
-		*x = 40;
-		*sz = 4;
-		break;
-	case CAR_SECTOR_2:
-		*x = 45;
-		*sz = 4;
-		break;
-	case CAR_SECTOR_3:
-		*x = 50;
-		*sz = 4;
-		break;
-	case CAR_NUM_PITS:
-		*x = 55;
-		*sz = 3;
-		break;
-	default:
-		return 0;
-	}
-
-	atom = &state->car_info[car - 1][type];
-
-	/* Check the colour is valid */
-	if (atom->data < COLOUR_POPUP) {
-		*attr = attrs[atom->data];
-	} else {
-		return 0;
-	}
-
-	/* Check for over-long atoms */
-	if (strlen ((const char *) atom->text) <= *sz) {
-		*text = atom->text;
-	} else {
-		return 0;
-	}
-
-	return 1;
-}
-
-/**
  * clear_board;
  * @state: application state structure.
  *
@@ -231,6 +133,8 @@ cell_info (CurrentState  *state,
 void
 clear_board (CurrentState *state)
 {
+	int i, j;
+
 	open_display ();
 	close_popup ();
 
@@ -246,10 +150,98 @@ clear_board (CurrentState *state)
 		   _("P"), _(""), _("Name"), _("Gap"), _("Int"), _("Time"),
 		   _("Sec1"), _("Sec2"), _("Sec3"), _("Pit"));
 
-	/* FIXME current information without an update */
+	for (i = 1; i <= state->num_cars; i++) {
+		for (j = 0; j < LAST_CAR_PACKET; j++)
+			_update_cell (state, i, j);
+	}
 
 	wnoutrefresh (boardwin);
 	doupdate ();
+}
+
+/**
+ * _update_cell:
+ * @state: application state structure,
+ * @car: car number to update,
+ * @type: atom to update.
+ *
+ * Update a particular cell on the board, with the necessary information
+ * available in the state structure.  For internal use, does not refresh
+ * or update the screen.
+ **/
+static void
+_update_cell (CurrentState  *state,
+	      int            car,
+	      CarPacketType  type)
+{
+	int         y, x, sz, attr;
+	CarAtom    *atom;
+	const char *text;
+
+	y = state->car_position[car - 1];
+	if (! y)
+		return;
+
+	switch (type) {
+	case CAR_POSITION:
+		x = 0;
+		sz = 2;
+		break;
+	case CAR_NUMBER:
+		x = 3;
+		sz = 2;
+		break;
+	case CAR_DRIVER:
+		x = 6;
+		sz = 14;
+		break;
+	case CAR_GAP:
+		x = 21;
+		sz = 4;
+		break;
+	case CAR_INTERVAL:
+		x = 26;
+		sz = 4;
+		break;
+	case CAR_LAP_TIME:
+		x = 31;
+		sz = 8;
+		break;
+	case CAR_SECTOR_1:
+		x = 40;
+		sz = 4;
+		break;
+	case CAR_SECTOR_2:
+		x = 45;
+		sz = 4;
+		break;
+	case CAR_SECTOR_3:
+		x = 50;
+		sz = 4;
+		break;
+	case CAR_NUM_PITS:
+		x = 55;
+		sz = 3;
+		break;
+	default:
+		return;
+	}
+
+	atom = &state->car_info[car - 1][type];
+	attr = attrs[atom->data];
+
+	/* Check for over-long atoms */
+	if (strlen ((const char *) atom->text) <= sz) {
+		text = atom->text;
+	} else {
+		text = "";
+	}
+
+	wmove (boardwin, y, x);
+	wattrset (boardwin, attr);
+
+	while (sz--)
+		waddch (boardwin, (*text ? *(text++) : ' '));
 }
 
 /**
@@ -267,22 +259,64 @@ update_cell (CurrentState  *state,
 	     int            car,
 	     CarPacketType  type)
 {
-	int         y, x, sz, attr;
-	const char *text;
-
-	if (!cursed)
+	if (! cursed)
 		clear_board (state);
 	close_popup ();
 
-	if (! cell_info (state, car, type, &y, &x, &sz, &attr, &text))
+	_update_cell (state, car, type);
+
+ 	wnoutrefresh (boardwin);
+	doupdate ();
+}
+
+/**
+ * update_car:
+ * @state: application state structure,
+ * @car: car number to update.
+ *
+ * Update the entire row for the given car, and the display when done.
+ **/
+void
+update_car (CurrentState *state,
+	    int           car)
+{
+	int i;
+
+	if (! cursed)
+		clear_board (state);
+	close_popup ();
+
+	for (i = 0; i < LAST_CAR_PACKET; i++)
+		_update_cell (state, car, i);
+
+ 	wnoutrefresh (boardwin);
+	doupdate ();
+}
+
+/**
+ * clear_car:
+ * @state: application state structure,
+ * @car: car number to update.
+ *
+ * Clear the car from the board, updating the display when done.
+ **/
+void
+clear_car (CurrentState *state,
+	   int           car)
+{
+	int y;
+
+	if (! cursed)
+		clear_board (state);
+
+	y = state->car_position[car - 1];
+	if (! y)
 		return;
 
-	wattrset (boardwin, attr);
-	wmove (boardwin, y, x);
-	while (sz--)
-		waddch (boardwin, ' ');
+	close_popup ();
 
-	mvwaddstr (boardwin, y, x, (const char *) text);
+	wmove (boardwin, y, 0);
+	wclrtoeol (boardwin);
 
 	wnoutrefresh (boardwin);
 	doupdate ();
@@ -291,13 +325,17 @@ update_cell (CurrentState  *state,
 /**
  * close_display:
  *
- * Closes the curses display and returns to normality.
+ * Waits for the user to press a key, then closes the curses display
+ * and returns to normality.
  **/
 void
 close_display (void)
 {
 	if (! cursed)
 		return;
+
+	nodelay (stdscr, FALSE);
+	wgetch (stdscr);
 
 	if (popupwin)
 		delwin (popupwin);
@@ -358,7 +396,7 @@ popup_message (const char *message)
 	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
 		msg[--msglen] = 0;
 
-	if (!msglen) {
+	if (! msglen) {
 		free (msg);
 		return;
 	}
@@ -436,7 +474,7 @@ popup_message (const char *message)
 void
 close_popup (void)
 {
-	if (!cursed || !popupwin)
+	if ((! cursed) || (! popupwin))
 		return;
 
 	delwin (popupwin);

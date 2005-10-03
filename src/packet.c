@@ -53,7 +53,7 @@ handle_car_packet (CurrentState *state,
 	 * Then increase the size of all the arrays and clear the board.
 	 */
 	if (packet->car > state->num_cars) {
-		int i;
+		int i, j;
 
 		state->car_position = realloc (state->car_position,
 					       sizeof (int) * packet->car);
@@ -61,9 +61,12 @@ handle_car_packet (CurrentState *state,
 					   sizeof (CarAtom *) * packet->car);
 
 		for (i = state->num_cars; i < packet->car; i++) {
+			state->car_position[i] = 0;
 			state->car_info[i] = malloc (sizeof (CarAtom)
 						     * LAST_CAR_PACKET);
-			memset (state->car_info[i], 0, sizeof (CarAtom));
+			for (j = 0; j < LAST_CAR_PACKET; j++)
+				memset (&state->car_info[i][j], 0,
+					sizeof (CarAtom));
 		}
 
 		state->num_cars = packet->car;
@@ -81,7 +84,7 @@ handle_car_packet (CurrentState *state,
 	case CAR_SECTOR_2:
 	case CAR_SECTOR_3:
 	case CAR_NUM_PITS: {
-		/* Car Data Atom:
+		/* Data Atom:
 		 * Format: string.
 		 * Data: colour.
 		 *
@@ -97,6 +100,28 @@ handle_car_packet (CurrentState *state,
 			strcpy (atom->text, (const char *) packet->payload);
 
 		update_cell (state, packet->car, packet->type);
+		break;
+	}
+	case CAR_POSITION_UPDATE: {
+		/* Position Update:
+		 * Data: new position.
+		 *
+		 * This is a non-atom packet that indicates that the
+		 * race position of a car has changed.  They often seem
+		 * to come in pairs, the first one with a zero position,
+		 * and the next with the new position, but not always
+		 * sadly.
+		 */
+		int i;
+
+		clear_car (state, packet->car);
+		for (i = 1; i <= state->num_cars; i++)
+			if (state->car_position[i] == packet->data)
+				state->car_position[i] = 0;
+
+		state->car_position[packet->car - 1] = packet->data;
+		if (packet->data)
+			update_car (state, packet->car);
 		break;
 	}
 	default:
@@ -117,7 +142,7 @@ handle_system_packet (CurrentState *state,
 		      const Packet *packet)
 {
 	switch ((SystemPacketType) packet->type) {
-	case SYS_EVENT_ID:
+	case SYS_EVENT_ID: {
 		/* Event Start:
 		 * Format: odd byte, then decimal.
 		 * Data: type of event.
@@ -126,7 +151,6 @@ handle_system_packet (CurrentState *state,
 		 * the board properly and obtain the decryption key for
 		 * the event.
 		 */
-	{
 		unsigned int event_no = 0, i;
 
 		for (i = 1; i < packet->len; i++) {
@@ -154,7 +178,7 @@ handle_system_packet (CurrentState *state,
 		      state->event_no, state->event_type);
 		break;
 	}
-	case SYS_KEY_FRAME:
+	case SYS_KEY_FRAME: {
 		/* Key Frame Marker:
 		 * Format: little-endian integer.
 		 *
@@ -162,7 +186,6 @@ handle_system_packet (CurrentState *state,
 		 * load this to get up to date.  Otherwise we just set
 		 * our counter and carry on
 		 */
-	{
 		unsigned int frame = 0, i;
 
 		i = packet->len;

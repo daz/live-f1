@@ -12,6 +12,7 @@ bin_PROGRAMS = \
 
 live_f1_SOURCES = \
 	main.c live-f1.h \
+	macros.h gettext.h \
 	display.c display.h \
 	http.c http.h \
 	packet.c packet.h \

@@ -148,7 +148,7 @@ print_version (void)
 	printf ("Copyright (C) 2005 Scott James Remnant <scott@netsplit.com>.\n");
 	printf ("\n");
 	printf (_("This is free software, covered by the GNU General Public License; see the\n"
-		  "source for the copying conditions.  There is NO warranty; not even for\n"
+		  "source for copying conditions.  There is NO warranty; not even for\n"
 		  "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"));
 	printf ("\n");
 }

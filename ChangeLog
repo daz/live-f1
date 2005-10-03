@@ -1,5 +1,28 @@
 2005-10-03  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (update_car): Updates an entire row of car
+	information, used when cars change positions, etc.
+	(update_cell): Take out the bulk of the real code from here,
+	(cell_info): and from here (removing this func), and put all of it in
+	(_update_cell): which does the work but doesn't update the screen;
+	also uses the car's position as the row now.
+	(clear_board): Actually draw any board information, as promised.
+	(clear_car): Clear a car from the board completely.
+	(close_display): Wait for a key press before returning to normality.
+	* src/display.h: Update.
+	* src/packet.c (handle_car_packet): Set the car position array entry
+	to zero after allocating it, also set more than the first atom to
+	zero too.  Handle the CAR_POSITION_UPDATE packet by clearing the row,
+	moving any car out of the new position and setting the new position
+	of this car; finally redraw the row if non-zero.
+	* src/stream.c (next_packet): Be more specific about which
+	packets we expect to have a length, and explicitly don't
+	handle the ones we don't know about.
+	* src/main.c (print_version): Delete the word "the" from the
+	version output.
+	* src/Makefile.am (live_f1_SOURCES): Add missing macros.h and
+	gettext.h
+
 	* src/main.c (print_version): Prints out the standard name,
 	version, copyright and licence preamble.
 	(main): Print the version every time we start, like a well

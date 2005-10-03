@@ -298,6 +298,23 @@ next_packet (CurrentState         *state,
 
 	if (packet->car) {
 		switch ((CarPacketType) packet->type) {
+		case CAR_POSITION:
+		case CAR_NUMBER:
+		case CAR_DRIVER:
+		case CAR_GAP:
+		case CAR_INTERVAL:
+		case CAR_LAP_TIME:
+		case CAR_SECTOR_1:
+		case CAR_SECTOR_2:
+		case CAR_SECTOR_3:
+		case CAR_NUM_PITS:
+		case CAR_UNKNOWN_1:
+		case CAR_UNKNOWN_2:
+		case CAR_UNKNOWN_3:
+			packet->len = SHORT_PACKET_LEN (pbuf);
+			packet->data = SHORT_PACKET_DATA (pbuf);
+			decrypt = 1;
+			break;
 		case CAR_POSITION_UPDATE:
 			packet->len = SPECIAL_PACKET_LEN (pbuf);
 			packet->data = SPECIAL_PACKET_DATA (pbuf);
@@ -309,9 +326,11 @@ next_packet (CurrentState         *state,
 			decrypt = 1;
 			break;
 		default:
-			packet->len = SHORT_PACKET_LEN (pbuf);
-			packet->data = SHORT_PACKET_DATA (pbuf);
-			decrypt = 1;
+			info (3, _("Unknown car packet type: %d\n"),
+			      packet->type);
+			packet->len = 0;
+			packet->data = 0;
+			decrypt = 0;
 			break;
 		}
 	} else {
