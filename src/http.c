@@ -66,6 +66,7 @@ numlen (unsigned int number)
 
 /**
  * obtain_auth_cookie:
+ * @host: host to obtain cookie from,
  * @email: e-mail address registered with the F1 website,
  * @password: paassword registered for @email.
  *
@@ -78,7 +79,8 @@ numlen (unsigned int number)
  * Returns: cookie in newly allocated string or NULL on failure.
  **/
 char *
-obtain_auth_cookie (const char *email,
+obtain_auth_cookie (const char *host,
+		    const char *email,
 		    const char *password)
 {
 	ne_session *sess;
@@ -97,7 +99,7 @@ obtain_auth_cookie (const char *email,
 	free (e_password);
 	free (e_email);
 
-	sess = ne_session_create ("http", "live-timing.formula1.com", 80);
+	sess = ne_session_create ("http", host, 80);
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */
@@ -157,6 +159,7 @@ parse_cookie_hdr (char       **value,
 
 /**
  * obtain_decryption_key:
+ * @host: host to obtain key from,
  * @event_no: official event number,
  * @cookie: uri-encoded cookie.
  *
@@ -168,7 +171,8 @@ parse_cookie_hdr (char       **value,
  * Returns: key obtained on success, or zero on failure.
  **/
 unsigned int
-obtain_decryption_key (unsigned int  event_no,
+obtain_decryption_key (const char   *host,
+		       unsigned int  event_no,
 		       const char   *cookie)
 {
 	ne_session   *sess;
@@ -183,7 +187,7 @@ obtain_decryption_key (unsigned int  event_no,
 		      + strlen (cookie) + 11);
 	sprintf (url, "%s%u.asp?auth=%s", KEY_URL_BASE, event_no, cookie);
 
-	sess = ne_session_create ("http", "live-timing.formula1.com", 80);
+	sess = ne_session_create ("http", host, 80);
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */
@@ -237,6 +241,7 @@ parse_key_body (unsigned int *key,
 
 /**
  * obtain_key_frame:
+ * @host: host to obtain key frame from,
  * @frame: key frame number to obtain,
  * @userdata: pointer to pass to stream parser.
  *
@@ -246,7 +251,8 @@ parse_key_body (unsigned int *key,
  * Returns: 0 on success, non-zero on failure.
  **/
 int
-obtain_key_frame (unsigned int  frame,
+obtain_key_frame (const char   *host,
+		  unsigned int  frame,
 		  void         *userdata)
 {
 	ne_session *sess;
@@ -266,7 +272,7 @@ obtain_key_frame (unsigned int  frame,
 		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);
 	}
 
-	sess = ne_session_create ("http", "localhost", 80);
+	sess = ne_session_create ("http", host, 80);
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */

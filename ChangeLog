@@ -1,5 +1,26 @@
 2005-10-06  Scott James Remnant  <scott@netsplit.com>
 
+	* src/http.c (obtain_auth_cookie): Add host parameter to avoid
+	hard-coding the site hostname.
+	(obtain_decryption_key): Add host parameter.
+	(obtain_key_frame): Add host parameter.
+	* src/http.h: Update.
+	* src/packet.c (handle_system_packet): Pass in hostname when
+	obtaining decryption key and key frame.
+	* src/live-f1.h (DEFAULT_HOST): Add macro for default host.
+	(CurrentState): Add host, email and password configuration.
+	* src/cfgfile.c (read_config): Reads the configuration file
+	and stores the settings in the state structure.
+	(fgets_alloc): Drop in my standard fgets_alloc function.
+	(write_config): Write configuration file using values stored
+	in the state structure.
+	(get_config): Prompt the user for settings and store in state.
+	* src/main.c (main): Read the configuration file, if it doesn't
+	exist, get the configuration from the user and write it out.
+	Use configuration values rather than hard-coded settings; removed
+	some needless prints.
+	* src/Makefile.am (live_f1_SOURCES): Add cfgfile.c and cfgfile.h.
+
 	* src/packet.c (handle_car_packet): Fix bug with POSITION_UPDATE
 	handling, car_position is a zero-based array so we have to clear
 	from zero to num_cars-1, not 1 to num-cars ... was cauing the

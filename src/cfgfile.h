@@ -17,21 +17,19 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_HTTP_H
-#define LIVE_F1_HTTP_H
+#ifndef LIVE_F1_CFGFILE_H
+#define LIVE_F1_CFGFILE_H
 
 #include "live-f1.h"
 
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (const char *host, const char *email,
-				    const char *password);
-unsigned int obtain_decryption_key (const char *host, unsigned int event_no,
-				    const char *cookie);
-int          obtain_key_frame      (const char *host, unsigned int frame,
-				    void *unknown);
+int read_config  (CurrentState *state, const char *filename);
+int write_config (CurrentState *state, const char *filename);
+
+int get_config  (CurrentState *state);
 
 SJR_END_EXTERN
 
-#endif /* LIVE_F1_HTTP_H */
+#endif /* LIVE_F1_CFGFILE_H */

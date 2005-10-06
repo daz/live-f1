@@ -161,7 +161,8 @@ handle_system_packet (CurrentState *state,
 			event_no += packet->payload[i] - '0';
 		}
 
-		state->key = obtain_decryption_key (event_no, state->cookie);
+		state->key = obtain_decryption_key (state->host, event_no,
+						    state->cookie);
 		state->event_no = event_no;
 		state->event_type = packet->data;
 		state->lap = 0;
@@ -200,7 +201,7 @@ handle_system_packet (CurrentState *state,
 		reset_decryption (state);
 		if (! state->frame) {
 			state->frame = frame;
-			obtain_key_frame (frame, state);
+			obtain_key_frame (state->host, frame, state);
 			reset_decryption (state);
 		} else {
 			state->frame = frame;

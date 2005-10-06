@@ -24,12 +24,14 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
 #include <locale.h>
 #include <unistd.h>
 
 #include <ne_socket.h>
 
 #include "live-f1.h"
+#include "cfgfile.h"
 #include "display.h"
 #include "http.h"
 #include "stream.h"
@@ -51,6 +53,8 @@ main (int   argc,
       char *argv[])
 {
 	CurrentState  state;
+	const char   *home_dir;
+	char         *config_file;
 	int           sock;
 
 	setlocale (LC_ALL, "");
@@ -58,6 +62,13 @@ main (int   argc,
 	textdomain (PACKAGE);
 
 	program_name = argv[0];
+
+	home_dir = getenv ("HOME");
+	if (! home_dir) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("unable to find HOME in environment"));
+		return 1;
+	}
 
 	print_version ();
 
@@ -67,25 +78,43 @@ main (int   argc,
 		return 1;
 	}
 
+
 	memset (&state, 0, sizeof (state));
+	state.host = NULL;
+	state.email = NULL;
+	state.password = NULL;
 	state.cookie = NULL;
 	state.car_position = NULL;
 	state.car_info = NULL;
 
+	config_file = malloc (strlen (home_dir) + 7);
+	sprintf (config_file, "%s/.f1rc", home_dir);
+
+	if (read_config (&state, config_file))
+		return 1;
+
+	if ((! state.email) || (! state.password)) {
+		if (get_config (&state) || write_config (&state, config_file))
+			return 1;
+	}
+
+	if (! state.host) {
+		state.host = DEFAULT_HOST;
+	}
+
+	free (config_file);
+
+
+	state.cookie = obtain_auth_cookie (state.host, state.email,
+					   state.password);
+	if (! state.cookie)
+		return 1;
+
+	sock = open_stream (state.host, 4321);
+	if (sock < 0)
+		return 1;
+
 	reset_decryption (&state);
-
-	state.cookie = obtain_auth_cookie ("scott-fia@netsplit.com",
-					   "mka773624");
-	if (! state.cookie) {
-		printf ("Unable to obtain authorisation cookie.\n");
-		return 1;
-	}
-
-	sock = open_stream ("localhost", 4321);
-	if (sock < 0) {
-		printf ("Unable to open data stream.\n");
-		return 1;
-	}
 
 	while (read_stream (&state, sock) > 0) {
 		if (should_quit (0))
