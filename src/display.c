@@ -383,9 +383,6 @@ close_display (void)
 	if (! cursed)
 		return;
 
-	nodelay (stdscr, FALSE);
-	wgetch (stdscr);
-
 	if (popupwin)
 		delwin (popupwin);
 	if (boardwin)
@@ -398,6 +395,7 @@ close_display (void)
 
 /**
  * should_quit:
+ * @wait: whether to wait for the key press.
  *
  * Checks for a key press on the keyboard matching any key we quit for
  * (Enter, Escape, q, etc.).
@@ -405,10 +403,13 @@ close_display (void)
  * Returns: 0 if none were pressed, 1 if one was.
  **/
 int
-should_quit (void)
+should_quit (int wait)
 {
 	if (! cursed)
 		return 0;
+
+	if (wait)
+		nodelay (stdscr, FALSE);
 
 	switch (getch ()) {
 	case KEY_ENTER:
