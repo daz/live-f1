@@ -1,3 +1,12 @@
+2005-10-06  Scott James Remnant  <scott@netsplit.com>
+
+	* src/display.c (should_quit): Take a flag to say whether we
+	should wait for the keypress, or just check for one already made.
+	(close_display): Don't wait for a key.
+	* src/display.h: Update.
+	* src/main.c (main): Don't wait for keys in the main loop, but do
+	wait for a key before exiting.
+
 2005-10-03  Scott James Remnant  <scott@netsplit.com>
 
 	* src/display.c (clear_board): Bail out if we end up on a display

@@ -81,17 +81,19 @@ main (int   argc,
 		return 1;
 	}
 
-	sock = open_stream ("syndicate.netsplit.com", 4321);
+	sock = open_stream ("localhost", 4321);
 	if (sock < 0) {
 		printf ("Unable to open data stream.\n");
 		return 1;
 	}
 
 	while (read_stream (&state, sock) > 0) {
-		if (should_quit ())
-			break;
+		if (should_quit (0))
+			goto exit;
 	}
 
+	should_quit (1);
+exit:
 	close_display ();
 	close (sock);
 
