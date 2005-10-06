@@ -118,7 +118,7 @@ handle_car_packet (CurrentState *state,
 		int i;
 
 		clear_car (state, packet->car);
-		for (i = 1; i <= state->num_cars; i++)
+		for (i = 0; i < state->num_cars; i++)
 			if (state->car_position[i] == packet->data)
 				state->car_position[i] = 0;
 

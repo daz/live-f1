@@ -1,5 +1,12 @@
 2005-10-06  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_car_packet): Fix bug with POSITION_UPDATE
+	handling, car_position is a zero-based array so we have to clear
+	from zero to num_cars-1, not 1 to num-cars ... was cauing the
+	remaining failure to restore lines.
+	* src/stream.c (read_stream): Remove the "Sending ping..." debug
+	statement, as it just fills the screen.
+
 	* src/packet.h (SystemPacketType): System type 14 appears to be
 	the flag/track status.
 	* src/live-f1.h (FlagStatus): Enum for track status/flag.

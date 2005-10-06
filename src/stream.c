@@ -172,8 +172,6 @@ read_stream (CurrentState *state, int sock)
 		if (timer++ < 10)
 			return 1;
 
-		info (3, _("Sending ping ...\n"));
-
 		/* Wake the server up */
 		buf[0] = 0x10;
 		ret = write (sock, buf, sizeof (buf));
