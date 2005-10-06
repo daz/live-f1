@@ -208,6 +208,25 @@ handle_system_packet (CurrentState *state,
 
 		break;
 	}
+	case SYS_TRACK_STATUS: {
+		/* Track Status:
+		 * Format: decimal.
+		 * Data: field to be updated.
+		 *
+		 * Indicates a change of the track status; the data field
+		 * appears to allow this to give us multiple values, but
+		 * I've only ever seen it equal 1 and give us the flag.
+		 */
+		switch (packet->data) {
+		case 1:
+			state->flag = packet->payload[0] - '0';
+			break;
+		default:
+			/* Unhandled field */
+			break;
+		}
+		break;
+	}
 	case SYS_COPYRIGHT:
 		/* Copyright Notice:
 		 * Format: string.

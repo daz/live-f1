@@ -128,7 +128,7 @@ open_stream (const char   *hostname,
 	}
 
 	if (sock < 0) {
-		fprintf (stderr, "%s; %s: %s\n", program_name,
+		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("failed to connect to data stream"),
 			 strerror (errno));
 
@@ -352,8 +352,8 @@ next_packet (CurrentState         *state,
 			packet->data = 0;
 			decrypt = 1;
 			break;
+		case SYS_TRACK_STATUS:
 		case SYS_UNKNOWN_SHORT_A:
-		case SYS_UNKNOWN_SHORT_B:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 1;

@@ -1,5 +1,14 @@
 2005-10-06  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h (SystemPacketType): System type 14 appears to be
+	the flag/track status.
+	* src/live-f1.h (FlagStatus): Enum for track status/flag.
+	(CurrentState): add flag property.
+	* src/packet.c (handle_system_packet): Handled the SYS_TRACK_STATUS
+	when the data field is 1 by saving the flag in the state struct.
+	* src/stream.c (open_stream): Fix typo in error.
+	(next_packet): Handle SYS_TRACK_STATUS instead of UNKNOWN_SHORT_B.
+
 	* src/display.c (should_quit): Take a flag to say whether we
 	should wait for the keypress, or just check for one already made.
 	(close_display): Don't wait for a key.

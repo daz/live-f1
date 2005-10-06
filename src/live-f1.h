@@ -41,6 +41,20 @@ typedef enum {
 	/* Don't know any of the others yet */
 } EventType;
 
+/**
+ * FlagStatus:
+ *
+ * Current track status or flag.
+ **/
+typedef enum {
+	GREEN_FLAG = 1,
+	YELLOW_FLAG,
+	SAFETY_CAR_STANDBY,
+	SAFETY_CAR_DEPLOYED,
+	RED_FLAG,
+	LAST_FLAG
+} FlagStatus;
+
 
 /**
  * CarAtom:
@@ -65,6 +79,7 @@ typedef struct {
  * @event_no: event number,
  * @event_type: event type,
  * @lap: current lap,
+ * @flag: track status or flag,
  * @num_cars: number of cars in the event,
  * @car_position: current position of car,
  * @car_info: arrays of information about each car.
@@ -80,6 +95,7 @@ typedef struct {
 	unsigned int   event_no;
 	EventType      event_type;
 	unsigned int   lap;
+	FlagStatus     flag;
 
 	int            num_cars;
 	int           *car_position;

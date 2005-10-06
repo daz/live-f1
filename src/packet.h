@@ -64,7 +64,7 @@ typedef enum {
 	SYS_STRANGE_A, /* Always two bytes */
 	SYS_UNKNOWN_SHORT_A = 9,
 	SYS_UNKNOWN_LONG_B,
-	SYS_UNKNOWN_SHORT_B,
+	SYS_TRACK_STATUS,
 	SYS_COPYRIGHT,
 	LAST_SYSTEM_PACKET
 } SystemPacketType;
