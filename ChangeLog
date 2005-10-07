@@ -1,5 +1,8 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/stream.c (open_stream): Decrease the irrelevance of the
+	"Connected to" message.
+
 	* src/live-f1.h (EventType): Practice sessions seem to carry an
 	event type of 2.
 	* src/packet.h (CarPacketType): Remove all the atom names from this

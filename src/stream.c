@@ -132,7 +132,7 @@ open_stream (const char   *hostname,
 			 _("failed to connect to data stream"),
 			 strerror (errno));
 	} else {
-		info (3, _("Connected to %s.\n"), addr->ai_canonname);
+		info (2, _("Connected to %s.\n"), addr->ai_canonname);
 	}
 
 	freeaddrinfo (res);
