@@ -49,6 +49,9 @@ typedef enum {
 	COLOUR_DATA,
 	COLOUR_OLD,
 	COLOUR_POPUP,
+	COLOUR_GREEN_FLAG,
+	COLOUR_YELLOW_FLAG,
+	COLOUR_RED_FLAG,
 	LAST_COLOUR
 } TextColour;
 
@@ -68,6 +71,7 @@ static int attrs[LAST_COLOUR];
 
 /* Various windows */
 static WINDOW *boardwin = NULL;
+static WINDOW *statwin = NULL;
 static WINDOW *popupwin = NULL;
 
 
@@ -94,32 +98,41 @@ open_display (void)
 
 	if (start_color () || (COLOR_PAIRS < LAST_COLOUR)) {
 		/* Black and white */
-		attrs[COLOUR_DEFAULT] = A_NORMAL;
-		attrs[COLOUR_LATEST]  = A_BOLD;
-		attrs[COLOUR_PIT]     = A_NORMAL;
-		attrs[COLOUR_BEST]    = A_STANDOUT;
-		attrs[COLOUR_RECORD]  = A_STANDOUT | A_BOLD;
-		attrs[COLOUR_DATA]    = A_NORMAL;
-		attrs[COLOUR_OLD]     = A_DIM;
-		attrs[COLOUR_POPUP]   = A_REVERSE;
+		attrs[COLOUR_DEFAULT]     = A_NORMAL;
+		attrs[COLOUR_LATEST]      = A_BOLD;
+		attrs[COLOUR_PIT]         = A_NORMAL;
+		attrs[COLOUR_BEST]        = A_STANDOUT;
+		attrs[COLOUR_RECORD]      = A_STANDOUT | A_BOLD;
+		attrs[COLOUR_DATA]        = A_NORMAL;
+		attrs[COLOUR_OLD]         = A_DIM;
+		attrs[COLOUR_POPUP]       = A_REVERSE;
+		attrs[COLOUR_GREEN_FLAG]  = A_NORMAL;
+		attrs[COLOUR_YELLOW_FLAG] = A_REVERSE | A_DIM;
+		attrs[COLOUR_RED_FLAG]    = A_REVERSE;
 	} else {
-		init_pair (COLOUR_DEFAULT, COLOR_WHITE,   COLOR_BLACK);
-		init_pair (COLOUR_LATEST,  COLOR_WHITE,   COLOR_BLACK);
-		init_pair (COLOUR_PIT,     COLOR_RED,     COLOR_BLACK);
-		init_pair (COLOUR_BEST,    COLOR_GREEN,   COLOR_BLACK);
-		init_pair (COLOUR_RECORD,  COLOR_MAGENTA, COLOR_BLACK);
-		init_pair (COLOUR_DATA,    COLOR_CYAN,    COLOR_BLACK);
-		init_pair (COLOUR_OLD,     COLOR_YELLOW,  COLOR_BLACK);
-		init_pair (COLOUR_POPUP,   COLOR_WHITE,   COLOR_BLUE);
+		init_pair (COLOUR_DEFAULT,     COLOR_WHITE,   COLOR_BLACK);
+		init_pair (COLOUR_LATEST,      COLOR_WHITE,   COLOR_BLACK);
+		init_pair (COLOUR_PIT,         COLOR_RED,     COLOR_BLACK);
+		init_pair (COLOUR_BEST,        COLOR_GREEN,   COLOR_BLACK);
+		init_pair (COLOUR_RECORD,      COLOR_MAGENTA, COLOR_BLACK);
+		init_pair (COLOUR_DATA,        COLOR_CYAN,    COLOR_BLACK);
+		init_pair (COLOUR_OLD,         COLOR_YELLOW,  COLOR_BLACK);
+		init_pair (COLOUR_POPUP,       COLOR_WHITE,   COLOR_BLUE);
+		init_pair (COLOUR_GREEN_FLAG,  COLOR_BLACK,   COLOR_GREEN);
+		init_pair (COLOUR_YELLOW_FLAG, COLOR_BLACK,   COLOR_YELLOW);
+		init_pair (COLOUR_RED_FLAG,    COLOR_RED,     COLOR_RED);
 
-		attrs[COLOUR_DEFAULT] = COLOR_PAIR(COLOUR_DEFAULT);
-		attrs[COLOUR_LATEST]  = COLOR_PAIR(COLOUR_LATEST);
-		attrs[COLOUR_PIT]     = COLOR_PAIR(COLOUR_PIT);
-		attrs[COLOUR_BEST]    = COLOR_PAIR(COLOUR_BEST);
-		attrs[COLOUR_RECORD]  = COLOR_PAIR(COLOUR_RECORD);
-		attrs[COLOUR_DATA]    = COLOR_PAIR(COLOUR_DATA);
-		attrs[COLOUR_OLD]     = COLOR_PAIR(COLOUR_OLD);
-		attrs[COLOUR_POPUP]   = COLOR_PAIR(COLOUR_POPUP) | A_BOLD;
+		attrs[COLOUR_DEFAULT]     = COLOR_PAIR (COLOUR_DEFAULT);
+		attrs[COLOUR_LATEST]      = COLOR_PAIR (COLOUR_LATEST);
+		attrs[COLOUR_PIT]         = COLOR_PAIR (COLOUR_PIT);
+		attrs[COLOUR_BEST]        = COLOR_PAIR (COLOUR_BEST);
+		attrs[COLOUR_RECORD]      = COLOR_PAIR (COLOUR_RECORD);
+		attrs[COLOUR_DATA]        = COLOR_PAIR (COLOUR_DATA);
+		attrs[COLOUR_OLD]         = COLOR_PAIR (COLOUR_OLD);
+		attrs[COLOUR_POPUP]       = COLOR_PAIR (COLOUR_POPUP) | A_BOLD;
+		attrs[COLOUR_GREEN_FLAG]  = COLOR_PAIR (COLOUR_GREEN_FLAG);
+		attrs[COLOUR_YELLOW_FLAG] = COLOR_PAIR (COLOUR_YELLOW_FLAG);
+		attrs[COLOUR_RED_FLAG]    = COLOR_PAIR (COLOUR_RED_FLAG);
 	}
 
 	bkgdset (attrs[COLOUR_DEFAULT]);
@@ -191,6 +204,13 @@ clear_board (CurrentState *state)
 
 	wnoutrefresh (boardwin);
 	doupdate ();
+
+	if (statwin) {
+		delwin (statwin);
+		statwin = NULL;
+
+		update_status (state);
+	}
 }
 
 /**
@@ -453,6 +473,69 @@ clear_car (CurrentState *state,
 }
 
 /**
+ * update_status:
+ * @state: application state structure,
+ *
+ * Update the status window, creating it if necessary.  Updates the
+ * display when done.
+ **/
+void
+update_status (CurrentState *state)
+{
+	if (! cursed)
+		clear_board (state);
+	close_popup ();
+
+	/* Put the window down the side if we have enough room */
+	if (! statwin) {
+		if (COLS < 80)
+			return;
+
+		statwin = newwin (nlines, 9, 0, COLS - 9);
+		wbkgdset (statwin, attrs[COLOUR_DEFAULT]);
+		werase (statwin);
+	}
+
+	/* Output the number of laps */
+	if (state->event_type == RACE_EVENT) {
+		wattrset (statwin, attrs[COLOUR_DEFAULT]);
+		mvwprintw (statwin, 1, 1, "LAP: %3d", state->lap);
+	}
+
+	/* Paint the flag */
+	wmove (statwin, state->event_type == RACE_EVENT ? 2 : 1, 1);
+	switch (state->flag) {
+	case GREEN_FLAG:
+		wattrset (statwin, attrs[COLOUR_GREEN_FLAG]);
+		waddstr (statwin, "       ");
+		break;
+	case YELLOW_FLAG:
+		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
+		waddstr (statwin, "       ");
+		break;
+	case SAFETY_CAR_STANDBY:
+		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
+		waddstr (statwin, "  SCS  ");
+		break;
+	case SAFETY_CAR_DEPLOYED:
+		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
+		waddstr (statwin, "  SCD  ");
+		break;
+	case RED_FLAG:
+		wattrset (statwin, attrs[COLOUR_RED_FLAG]);
+		waddstr (statwin, "STOPPED");
+		break;
+	default:
+		wattrset (statwin, attrs[COLOUR_DEFAULT]);
+		waddstr (statwin, "       ");
+		break;
+	}
+
+	wnoutrefresh (statwin);
+	doupdate ();
+}
+
+/**
  * close_display:
  *
  * Waits for the user to press a key, then closes the curses display
@@ -617,5 +700,10 @@ close_popup (void)
 	if (boardwin) {
 		redrawwin (boardwin);
 		wnoutrefresh (boardwin);
+	}
+
+	if (statwin) {
+		redrawwin (statwin);
+		wnoutrefresh (statwin);
 	}
 }

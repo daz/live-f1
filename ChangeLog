@@ -1,5 +1,18 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (open_display): Add colours for displaying the
+	various track status flags, use reverse video to make them obvious.
+	(update_status): Create the status window if necessary then update
+	it from the state structure.  Currently outputs the lap number
+	during a race (which is always zero currently), and the flag.
+	(clear_board): Delete and update from scratch the status window,
+	as we've almost certainly changed our size.
+	(close_popup): Redraw the status window if it exists.
+
+	* src/display.h: Update.
+	* src/packet.c (handle_system_packet): Update the status window
+	when the flag changes.
+
 	* src/packet.h (SystemPacketType): Type 10 contains textual speed
 	data for all of the drivers.  Type 4 contains the text commentary
 	for the event.  Type 9 contains the weather information, numerically

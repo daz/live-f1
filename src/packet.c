@@ -204,6 +204,7 @@ handle_system_packet (CurrentState *state,
 		switch (packet->data) {
 		case 1:
 			state->flag = packet->payload[0] - '0';
+			update_status (state);
 			break;
 		default:
 			/* Unhandled field */
