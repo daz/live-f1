@@ -1,5 +1,12 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/http.c (obtain_key_frame): Use MAX not MIN when calculating
+	the length of the string we need for the URL; otherwise we go the
+	wrong way and don't make enough memory.  When the key frame request
+	fails, make sure we also free the neon session.
+	* src/stream.c (open_stream): Make sure we don't leave without
+	freeing the addrinfo results.
+
 	* src/http.c (obtain_auth_cookie): Remove hard-coding of my
 	authentication cookie now we can look it up using the user's
 	real details.

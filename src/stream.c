@@ -131,12 +131,11 @@ open_stream (const char   *hostname,
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("failed to connect to data stream"),
 			 strerror (errno));
-
-		freeaddrinfo (res);
-		return -1;
+	} else {
+		info (3, _("Connected to %s.\n"), addr->ai_canonname);
 	}
 
-	info (3, _("Connected to %s.\n"), addr->ai_canonname);
+	freeaddrinfo (res);
 	return sock;
 }
 

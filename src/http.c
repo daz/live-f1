@@ -260,7 +260,7 @@ obtain_key_frame (const char   *host,
 		info (2, _("Obtaining key frame %d ...\n"), frame);
 
 		url = malloc (strlen (KEYFRAME_URL_PREFIX)
-			      + MIN(numlen (frame), 5) + 6);
+			      + MAX (numlen (frame), 5) + 6);
 		sprintf (url, "%s_%05d.bin", KEYFRAME_URL_PREFIX, frame);
 	} else {
 		info (1, _("Obtaining master key frame ...\n"));
@@ -282,9 +282,10 @@ obtain_key_frame (const char   *host,
 	/* Dispatch the event */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key request failed"), ne_get_error (sess));
+			 _("key frame request failed"), ne_get_error (sess));
 
 		ne_request_destroy (req);
+		ne_session_destroy (sess);
 		return 1;
 	}
 
