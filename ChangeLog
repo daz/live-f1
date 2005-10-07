@@ -1,5 +1,11 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/http.c (obtain_auth_cookie): Remove hard-coding of my
+	authentication cookie now we can look it up using the user's
+	real details.
+	(obtain_decryption_key): Remove hard-coding of the Brazil 2005
+	decryption key.
+
 	* src/display.c (clear_board): Calculate the number of lines we need
 	by finding the highest position, not just using the number of cars.
 	Use the new nlines variable and don't hard-code the minimum number
