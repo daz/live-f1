@@ -33,6 +33,9 @@
 #include "display.h"
 
 
+/* Minimum number of cars to assume */
+#define MIN_CARS 20
+
 /* Colours to be allocated, note that this mostly matches the data stream
  * values except that 0 is default text here and empty for the data stream,
  * we take care of clearing it instead.
@@ -56,6 +59,9 @@ static void _update_cell (CurrentState *state, int car, CarPacketType type);
 
 /* Curses display running */
 int cursed = 0;
+
+/* Number of lines being used for the board */
+static int nlines = 0;
 
 /* Attributes for the colours */
 static int attrs[LAST_COLOUR];
@@ -141,8 +147,11 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	i = MIN (21, state->num_cars + 1);
-	if (LINES < i) {
+	nlines = MAX (state->num_cars, MIN_CARS);
+	for (i = 0; i < state->num_cars; i++)
+		nlines = MAX (nlines, state->car_position[i]);
+	nlines += 1;
+	if (LINES < nlines) {
 		close_display ();
 		fprintf (stderr, "%s: %s\n", program_name,
 			 _("insufficient lines on display"));
@@ -155,7 +164,7 @@ clear_board (CurrentState *state)
 		exit (10);
 	}
 
-	boardwin = newwin (i, 69, 0, 0);
+	boardwin = newwin (nlines, 69, 0, 0);
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
 
@@ -196,6 +205,8 @@ _update_cell (CurrentState  *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
+	if (nlines < y)
+		clear_board (state);
 
 	switch (type) {
 	case CAR_POSITION:
@@ -361,6 +372,8 @@ clear_car (CurrentState *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
+	if (nlines < y)
+		clear_board (state);
 
 	close_popup ();
 
@@ -528,7 +541,7 @@ close_popup (void)
 		return;
 
 	delwin (popupwin);
-	popupwin = 0;
+	popupwin = NULL;
 
 	redrawwin (stdscr);
 	wnoutrefresh (stdscr);

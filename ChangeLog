@@ -1,5 +1,13 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (clear_board): Calculate the number of lines we need
+	by finding the highest position, not just using the number of cars.
+	Use the new nlines variable and don't hard-code the minimum number
+	of cars, but use a macro.
+	(_update_cell): If we don't have enough lines for the row, clear the
+	board and resize it.
+	(close_popup): Set popupwin to NULL.
+
 	* src/cfgfile.c (read_config): Fix bug with empty lines and
 	comments, adding back missing continue line.
 
