@@ -74,9 +74,8 @@ read_config (CurrentState *state,
 		char *ptr;
 
 		++lineno;
-		if ((line[0] == '#') || (line[0] == '\0')) {
-			free (line);
-		}
+		if ((line[0] == '#') || (line[0] == '\0'))
+			continue;
 
 		ptr = line + strcspn (line, " \t\r\n");
 		if (! *ptr) {

@@ -1,3 +1,8 @@
+2005-10-07  Scott James Remnant  <scott@netsplit.com>
+
+	* src/cfgfile.c (read_config): Fix bug with empty lines and
+	comments, adding back missing continue line.
+
 2005-10-06  Scott James Remnant  <scott@netsplit.com>
 
 	* src/http.c (obtain_auth_cookie): Add host parameter to avoid
