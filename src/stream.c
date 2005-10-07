@@ -319,26 +319,20 @@ next_packet (CurrentState         *state,
 			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 0;
 			break;
-		case SYS_UNKNOWN_SPECIAL_A:
-		case SYS_UNKNOWN_SPECIAL_B:
-			packet->len = SPECIAL_PACKET_LEN (pbuf);
-			packet->data = SPECIAL_PACKET_DATA (pbuf);
-			decrypt = 0;
-			break;
-		case SYS_STRANGE_A:
+		case SYS_TIMESTAMP:
 			packet->len = 2;
 			packet->data = 0;
 			decrypt = 1;
 			break;
+		case SYS_WEATHER:
 		case SYS_TRACK_STATUS:
-		case SYS_UNKNOWN_SHORT_A:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
 			decrypt = 1;
 			break;
-		case SYS_UNKNOWN_LONG_A:
-		case SYS_UNKNOWN_LONG_B:
+		case SYS_COMMENTARY:
 		case SYS_NOTICE:
+		case SYS_SPEED:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 1;

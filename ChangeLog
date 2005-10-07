@@ -1,5 +1,15 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h (SystemPacketType): Type 10 contains textual speed
+	data for all of the drivers.  Type 4 contains the text commentary
+	for the event.  Type 9 contains the weather information, numerically
+	with data to tell us what to change.  Type 7 seems to be some kind
+	of timestamp related to the weather, a 16-bit le int which is mixed
+	in with the weather data to provide history.  Drop the two "special"
+	type names, I still don't know what these are for.
+	* src/stream.c (next_packet): Update to use new type names; drop the
+	handling of the special types and let them fall back to unknown.
+
 	* src/stream.c (open_stream): Decrease the irrelevance of the
 	"Connected to" message.
 
