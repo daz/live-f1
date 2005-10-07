@@ -54,7 +54,7 @@ typedef enum {
 
 
 /* Forward prototypes */
-static void _update_cell (CurrentState *state, int car, CarPacketType type);
+static void _update_cell (CurrentState *state, int car, int type);
 
 
 /* Curses display running */
@@ -67,8 +67,8 @@ static int nlines = 0;
 static int attrs[LAST_COLOUR];
 
 /* Various windows */
-static WINDOW *boardwin = 0;
-static WINDOW *popupwin = 0;
+static WINDOW *boardwin = NULL;
+static WINDOW *popupwin = NULL;
 
 
 /**
@@ -168,10 +168,21 @@ clear_board (CurrentState *state)
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
 
-	mvwprintw (boardwin, 0, 0,
-		   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
-		   _("P"), _(""), _("Name"), _("Gap"), _("Int"), _("Time"),
-		   _("Sector 1"), _("Sector 2"), _("Sector 3"), _("Ps"));
+	switch (state->event_type) {
+	case RACE_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
+			   _("P"), _(""), _("Name"), _("Gap"), _("Int"),
+			   _("Time"), _("Sector 1"), _("Sector 2"),
+			   _("Sector 3"), _("Ps"));
+		break;
+	case PRACTICE_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
+			   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
+			   _("Sec 1"), _("Sec 2"), _("Sec 3"), _("Laps"));
+		break;
+	}
 
 	for (i = 1; i <= state->num_cars; i++) {
 		for (j = 0; j < LAST_CAR_PACKET; j++)
@@ -193,9 +204,9 @@ clear_board (CurrentState *state)
  * or update the screen.
  **/
 static void
-_update_cell (CurrentState  *state,
-	      int            car,
-	      CarPacketType  type)
+_update_cell (CurrentState *state,
+	      int           car,
+	      int           type)
 {
 	int         y, x, sz, align, attr;
 	CarAtom    *atom;
@@ -208,71 +219,128 @@ _update_cell (CurrentState  *state,
 	if (nlines < y)
 		clear_board (state);
 
-	switch (type) {
-	case CAR_POSITION:
-		x = 0;
-		sz = 2;
-		align = 1;
+	switch (state->event_type) {
+	case RACE_EVENT:
+		switch ((RaceAtomType) type) {
+		case RACE_POSITION:
+			x = 0;
+			sz = 2;
+			align = 1;
+			break;
+		case RACE_NUMBER:
+			x = 3;
+			sz = 2;
+			align = 1;
+			break;
+		case RACE_DRIVER:
+			x = 6;
+			sz = 14;
+			align = -1;
+			break;
+		case RACE_GAP:
+			x = 21;
+			sz = 4;
+			align = 1;
+			break;
+		case RACE_INTERVAL:
+			x = 26;
+			sz = 4;
+			align = 1;
+			break;
+		case RACE_LAP_TIME:
+			x = 31;
+			sz = 8;
+			align = -1;
+			break;
+		case RACE_SECTOR_1:
+			x = 40;
+			sz = 4;
+			align = 1;
+			break;
+		case RACE_LAP_STOP:
+			x = 45;
+			sz = 3;
+			align = -1;
+			break;
+		case RACE_SECTOR_2:
+			x = 49;
+			sz = 4;
+			align = 1;
+			break;
+		case RACE_LAP_IN_PIT:
+			x = 54;
+			sz = 3;
+			align = -1;
+			break;
+		case RACE_SECTOR_3:
+			x = 58;
+			sz = 4;
+			align = 1;
+			break;
+		case RACE_LAP_OUT:
+			x = 63;
+			sz = 3;
+			align = -1;
+			break;
+		case RACE_NUM_PITS:
+			x = 67;
+			sz = 2;
+			align = 1;
+			break;
+		default:
+			return;
+		}
 		break;
-	case CAR_NUMBER:
-		x = 3;
-		sz = 2;
-		align = 1;
-		break;
-	case CAR_DRIVER:
-		x = 6;
-		sz = 14;
-		align = -1;
-		break;
-	case CAR_GAP:
-		x = 21;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_INTERVAL:
-		x = 26;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_LAP_TIME:
-		x = 31;
-		sz = 8;
-		align = -1;
-		break;
-	case CAR_SECTOR_1:
-		x = 40;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_LAP_STOP:
-		x = 45;
-		sz = 3;
-		align = -1;
-		break;
-	case CAR_SECTOR_2:
-		x = 49;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_LAP_IN_PIT:
-		x = 54;
-		sz = 3;
-		align = -1;
-		break;
-	case CAR_SECTOR_3:
-		x = 58;
-		sz = 4;
-		align = 1;
-		break;
-	case CAR_LAP_OUT:
-		x = 63;
-		sz = 3;
-		align = -1;
-		break;
-	case CAR_NUM_PITS:
-		x = 67;
-		sz = 2;
-		align = 1;
+	case PRACTICE_EVENT:
+		switch ((PracticeAtomType) type) {
+		case PRACTICE_POSITION:
+			x = 0;
+			sz = 2;
+			align = 1;
+			break;
+		case PRACTICE_NUMBER:
+			x = 3;
+			sz = 2;
+			align = 1;
+			break;
+		case PRACTICE_DRIVER:
+			x = 6;
+			sz = 14;
+			align = -1;
+			break;
+		case PRACTICE_BEST:
+			x = 21;
+			sz = 8;
+			align = 1;
+			break;
+		case PRACTICE_GAP:
+			x = 30;
+			sz = 6;
+			align = 1;
+			break;
+		case PRACTICE_SECTOR_1:
+			x = 37;
+			sz = 5;
+			align = 1;
+			break;
+		case PRACTICE_SECTOR_2:
+			x = 43;
+			sz = 5;
+			align = 1;
+			break;
+		case PRACTICE_SECTOR_3:
+			x = 49;
+			sz = 5;
+			align = 1;
+			break;
+		case PRACTICE_LAPS:
+			x = 55;
+			sz = 4;
+			align = 1;
+			break;
+		default:
+			return;
+		}
 		break;
 	default:
 		return;
@@ -315,9 +383,9 @@ _update_cell (CurrentState  *state,
  * updates the display when done.
  **/
 void
-update_cell (CurrentState  *state,
-	     int            car,
-	     CarPacketType  type)
+update_cell (CurrentState *state,
+	     int           car,
+	     int           type)
 {
 	if (! cursed)
 		clear_board (state);

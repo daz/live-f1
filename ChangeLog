@@ -1,5 +1,22 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (EventType): Practice sessions seem to carry an
+	event type of 2.
+	* src/packet.h (CarPacketType): Remove all the atom names from this
+	enum and instead just record the event types.
+	(RaceAtomType): Put the descriptions of each race atom type here.
+	* src/packet.c (handle_car_packet): Handle atom types in the default
+	block, we know that these always are.  Avoid ugly switch style.
+	(handle_system_packet): Avoid ugly switch style.
+	* src/stream.c (next_packet): Handle atom types in the default block.
+	* src/display.c (clear_board): Change the header depending on the
+	event type.
+	(update_cell): Take int rather than CarPacketType as we don't know
+	which atom type we have until we look at state.
+	(_update_cell): Take int rather than CarPacketType as well, switch
+	on the event type before looking at the atom type.
+	* src/display.h: Update,
+
 	* src/main.c (main): Allocate the state structure rather than using
 	a copy on the stack, just makes things a little more consistent.
 

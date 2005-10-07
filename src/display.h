@@ -35,7 +35,7 @@ void close_display (void);
 int  should_quit   (int wait);
 
 void clear_board   (CurrentState *state);
-void update_cell   (CurrentState *state, int car, CarPacketType type);
+void update_cell   (CurrentState *state, int car, int type);
 void update_car    (CurrentState *state, int car);
 void clear_car     (CurrentState *state, int car);
 

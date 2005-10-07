@@ -26,27 +26,55 @@
 /**
  * CarPacketType:
  *
- * Known types of packets for cars, mostly these consist of a table
- * cell update with the colour in the data field.
+ * Known types of non-atom packets for cars.
  **/
 typedef enum {
-	CAR_POSITION_UPDATE,
-	CAR_POSITION,
-	CAR_NUMBER,
-	CAR_DRIVER,
-	CAR_GAP,
-	CAR_INTERVAL,
-	CAR_LAP_TIME,
-	CAR_SECTOR_1,
-	CAR_LAP_STOP,
-	CAR_SECTOR_2,
-	CAR_LAP_IN_PIT,
-	CAR_SECTOR_3,
-	CAR_LAP_OUT,
-	CAR_NUM_PITS,
+	CAR_POSITION_UPDATE = 0,
 	CAR_POSITION_HISTORY = 15,
 	LAST_CAR_PACKET
 } CarPacketType;
+
+/**
+ * RaceAtomType:
+ *
+ * Known types of data atoms for cars during a race event.
+ **/
+typedef enum {
+	RACE_POSITION = 1,
+	RACE_NUMBER,
+	RACE_DRIVER,
+	RACE_GAP,
+	RACE_INTERVAL,
+	RACE_LAP_TIME,
+	RACE_SECTOR_1,
+	RACE_LAP_STOP,
+	RACE_SECTOR_2,
+	RACE_LAP_IN_PIT,
+	RACE_SECTOR_3,
+	RACE_LAP_OUT,
+	RACE_NUM_PITS,
+	LAST_RACE_ATOM
+} RaceAtomType;
+
+/**
+ * PracticeAtomType:
+ *
+ * Known types of data atoms for cars during a race event.
+ **/
+typedef enum {
+	PRACTICE_POSITION = 1,
+	PRACTICE_NUMBER,
+	PRACTICE_DRIVER,
+	PRACTICE_BEST,
+	PRACTICE_GAP,
+	PRACTICE_SECTOR_1,
+	PRACTICE_SECTOR_2,
+	PRACTICE_SECTOR_3,
+	PRACTICE_LAPS,
+	PRACTICE_UNKNOWN,
+	LAST_PRACTICE
+} PracticeAtomType;
+
 
 /**
  * SystemPacketType:

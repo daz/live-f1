@@ -40,8 +40,8 @@
  * in a table.
  **/
 typedef enum {
-	RACE_EVENT = 1
-	/* Don't know any of the others yet */
+	RACE_EVENT = 1,
+	PRACTICE_EVENT = 2
 } EventType;
 
 /**

@@ -74,38 +74,10 @@ handle_car_packet (CurrentState *state,
 	}
 
 	switch ((CarPacketType) packet->type) {
-	case CAR_POSITION:
-	case CAR_NUMBER:
-	case CAR_DRIVER:
-	case CAR_GAP:
-	case CAR_INTERVAL:
-	case CAR_LAP_TIME:
-	case CAR_SECTOR_1:
-	case CAR_LAP_STOP:
-	case CAR_SECTOR_2:
-	case CAR_LAP_IN_PIT:
-	case CAR_SECTOR_3:
-	case CAR_LAP_OUT:
-	case CAR_NUM_PITS: {
-		/* Data Atom:
-		 * Format: string.
-		 * Data: colour.
-		 *
-		 * Each of these events updates a particular piece of data
-		 * for the car, some (with no length) only update the colour
-		 * of a field.
-		 */
 		CarAtom *atom;
+		int      i;
 
-		atom = &state->car_info[packet->car - 1][packet->type];
-		atom->data = packet->data;
-		if (packet->len >= 0)
-			strcpy (atom->text, (const char *) packet->payload);
-
-		update_cell (state, packet->car, packet->type);
-		break;
-	}
-	case CAR_POSITION_UPDATE: {
+	case CAR_POSITION_UPDATE:
 		/* Position Update:
 		 * Data: new position.
 		 *
@@ -115,8 +87,6 @@ handle_car_packet (CurrentState *state,
 		 * and the next with the new position, but not always
 		 * sadly.
 		 */
-		int i;
-
 		clear_car (state, packet->car);
 		for (i = 0; i < state->num_cars; i++)
 			if (state->car_position[i] == packet->data)
@@ -125,10 +95,25 @@ handle_car_packet (CurrentState *state,
 		state->car_position[packet->car - 1] = packet->data;
 		if (packet->data)
 			update_car (state, packet->car);
-		break;
-	}
+		return;
+	case CAR_POSITION_HISTORY:
+		/* Currently unhandled */
+		return;
 	default:
-		/* Unhandled packet */
+		/* Data Atom:
+		 * Format: string.
+		 * Data: colour.
+		 *
+		 * Each of these events updates a particular piece of data
+		 * for the car, some (with no length) only update the colour
+		 * of a field.
+		 */
+		atom = &state->car_info[packet->car - 1][packet->type];
+		atom->data = packet->data;
+		if (packet->len >= 0)
+			strcpy (atom->text, (const char *) packet->payload);
+
+		update_cell (state, packet->car, packet->type);
 		break;
 	}
 }
@@ -145,7 +130,9 @@ handle_system_packet (CurrentState *state,
 		      const Packet *packet)
 {
 	switch ((SystemPacketType) packet->type) {
-	case SYS_EVENT_ID: {
+		unsigned int number, i;
+
+	case SYS_EVENT_ID:
 		/* Event Start:
 		 * Format: odd byte, then decimal.
 		 * Data: type of event.
@@ -154,16 +141,15 @@ handle_system_packet (CurrentState *state,
 		 * the board properly and obtain the decryption key for
 		 * the event.
 		 */
-		unsigned int event_no = 0, i;
-
+		number = 0;
 		for (i = 1; i < packet->len; i++) {
-			event_no *= 10;
-			event_no += packet->payload[i] - '0';
+			number *= 10;
+			number += packet->payload[i] - '0';
 		}
 
-		state->key = obtain_decryption_key (state->host, event_no,
+		state->key = obtain_decryption_key (state->host, number,
 						    state->cookie);
-		state->event_no = event_no;
+		state->event_no = number;
 		state->event_type = packet->data;
 		state->lap = 0;
 		state->num_cars = 0;
@@ -181,8 +167,7 @@ handle_system_packet (CurrentState *state,
 		info (3, _("Begin new event #%d (type: %d)\n"),
 		      state->event_no, state->event_type);
 		break;
-	}
-	case SYS_KEY_FRAME: {
+	case SYS_KEY_FRAME:
 		/* Key Frame Marker:
 		 * Format: little-endian integer.
 		 *
@@ -190,26 +175,24 @@ handle_system_packet (CurrentState *state,
 		 * load this to get up to date.  Otherwise we just set
 		 * our counter and carry on
 		 */
-		unsigned int frame = 0, i;
-
+		number = 0;
 		i = packet->len;
 		while (i) {
-			frame <<= 8;
-			frame |= packet->payload[--i];
+			number <<= 8;
+			number |= packet->payload[--i];
 		}
 
 		reset_decryption (state);
 		if (! state->frame) {
-			state->frame = frame;
-			obtain_key_frame (state->host, frame, state);
+			state->frame = number;
+			obtain_key_frame (state->host, number, state);
 			reset_decryption (state);
 		} else {
-			state->frame = frame;
+			state->frame = number;
 		}
 
 		break;
-	}
-	case SYS_TRACK_STATUS: {
+	case SYS_TRACK_STATUS:
 		/* Track Status:
 		 * Format: decimal.
 		 * Data: field to be updated.
@@ -227,7 +210,6 @@ handle_system_packet (CurrentState *state,
 			break;
 		}
 		break;
-	}
 	case SYS_COPYRIGHT:
 		/* Copyright Notice:
 		 * Format: string.
