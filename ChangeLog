@@ -1,5 +1,8 @@
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (main): Allocate the state structure rather than using
+	a copy on the stack, just makes things a little more consistent.
+
 	* src/http.c (obtain_key_frame): Use MAX not MIN when calculating
 	the length of the string we need for the URL; otherwise we go the
 	wrong way and don't make enough memory.  When the key frame request

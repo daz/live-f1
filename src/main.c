@@ -52,7 +52,7 @@ int
 main (int   argc,
       char *argv[])
 {
-	CurrentState  state;
+	CurrentState *state;
 	const char   *home_dir;
 	char         *config_file;
 	int           sock;
@@ -79,44 +79,44 @@ main (int   argc,
 	}
 
 
-	memset (&state, 0, sizeof (state));
-	state.host = NULL;
-	state.email = NULL;
-	state.password = NULL;
-	state.cookie = NULL;
-	state.car_position = NULL;
-	state.car_info = NULL;
+	state = malloc (sizeof (CurrentState));
+	memset (state, 0, sizeof (state));
+	state->host = NULL;
+	state->email = NULL;
+	state->password = NULL;
+	state->cookie = NULL;
+	state->car_position = NULL;
+	state->car_info = NULL;
 
 	config_file = malloc (strlen (home_dir) + 7);
 	sprintf (config_file, "%s/.f1rc", home_dir);
 
-	if (read_config (&state, config_file))
+	if (read_config (state, config_file))
 		return 1;
 
-	if ((! state.email) || (! state.password)) {
-		if (get_config (&state) || write_config (&state, config_file))
+	if ((! state->email) || (! state->password)) {
+		if (get_config (state) || write_config (state, config_file))
 			return 1;
 	}
 
-	if (! state.host) {
-		state.host = DEFAULT_HOST;
-	}
+	if (! state->host)
+		state->host = DEFAULT_HOST;
 
 	free (config_file);
 
 
-	state.cookie = obtain_auth_cookie (state.host, state.email,
-					   state.password);
-	if (! state.cookie)
+	state->cookie = obtain_auth_cookie (state->host, state->email,
+					    state->password);
+	if (! state->cookie)
 		return 1;
 
-	sock = open_stream (state.host, 4321);
+	sock = open_stream (state->host, 4321);
 	if (sock < 0)
 		return 1;
 
-	reset_decryption (&state);
+	reset_decryption (state);
 
-	while (read_stream (&state, sock) > 0) {
+	while (read_stream (state, sock) > 0) {
 		if (should_quit (0))
 			goto exit;
 	}
