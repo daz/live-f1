@@ -152,6 +152,8 @@ handle_system_packet (CurrentState *state,
 						    state->cookie);
 		state->event_no = number;
 		state->event_type = packet->data;
+		state->epoch_time = 0;
+		state->remaining_time = 0;
 		state->lap = 0;
 		state->num_cars = 0;
 		if (state->car_position) {
@@ -209,11 +211,13 @@ handle_system_packet (CurrentState *state,
 			/* Session time remaining.
 			 * This is only sent once a minute in H:MM:SS format,
 			 * we therefore parse it and use it to update our
-			 * own record of when the session is due to end.
+			 * own record of the amount of time remaining in the
+			 * session.
 			 *
 			 * It also appears to be sent with a -1 length to
-			 * indicate the passing of the minute; we ignore those
-			 * at the moment.
+			 * indicate the passing of the minute; we use the
+			 * first one of these to indicate the start of a
+			 * session.
 			 */
 			if (packet->len > 0) {
 				unsigned int total;
@@ -233,9 +237,14 @@ handle_system_packet (CurrentState *state,
 				total *= 60;
 				total += number;
 
-				state->end_time = time (NULL) + total;
-				update_time (state);
+				if (state->epoch_time)
+					state->epoch_time = time (NULL);
+				state->remaining_time = total;
+			} else {
+				state->epoch_time = time (NULL);
 			}
+
+			update_time (state);
 			break;
 		default:
 			/* Unhandled field */

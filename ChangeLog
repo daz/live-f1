@@ -1,5 +1,14 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (CurrentState): Instead of storing the end_time,
+	which we can never really know; store the remaining time and when
+	that was last updated.  epoch_time will be 0 until we begin counting.
+	* src/packet.c (handle_system_packet): Update fields accordingly,
+	and make sure we reset the times when we learn of a new event.
+	* src/display.c (_update_time): Calculate the remaining time by
+	adding the epoch_time and remaining_time together, unless epoch_time
+	is zero in which case it's always the reminaing time.
+
 	* src/live-f1.h (CurrentState): Add a field to store the end time
 	of the current session.
 	* src/packet.c (handle_system_packet): Handle the SYS_WEATHER packet

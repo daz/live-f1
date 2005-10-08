@@ -85,6 +85,8 @@ typedef struct {
  * @frame: last seen key frame,
  * @event_no: event number,
  * @event_type: event type,
+ * @remaining_time: time remaining for the event,
+ * @epoch_time: epoch time @remaining_time was updated,
  * @end_time: time the session will end,
  * @lap: current lap,
  * @flag: track status or flag,
@@ -103,7 +105,7 @@ typedef struct {
 
 	unsigned int   event_no;
 	EventType      event_type;
-	time_t         end_time;
+	time_t         remaining_time, epoch_time;
 	unsigned int   lap;
 	FlagStatus     flag;
 
