@@ -21,6 +21,7 @@
 #define LIVE_F1_H
 
 #include <gettext.h>
+#include <time.h>
 
 #include "macros.h"
 
@@ -84,6 +85,7 @@ typedef struct {
  * @frame: last seen key frame,
  * @event_no: event number,
  * @event_type: event type,
+ * @end_time: time the session will end,
  * @lap: current lap,
  * @flag: track status or flag,
  * @num_cars: number of cars in the event,
@@ -101,6 +103,7 @@ typedef struct {
 
 	unsigned int   event_no;
 	EventType      event_type;
+	time_t         end_time;
 	unsigned int   lap;
 	FlagStatus     flag;
 

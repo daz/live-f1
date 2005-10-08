@@ -1,3 +1,28 @@
+2005-10-08  Scott James Remnant  <scott@netsplit.com>
+
+	* src/live-f1.h (CurrentState): Add a field to store the end time
+	of the current session.
+	* src/packet.c (handle_system_packet): Handle the SYS_WEATHER packet
+	when the data is 0, and use it to work out the end time of the
+	session.  Update the time on the display when done.
+	* src/display.c (clear_board): Go back to a hard-coded minimum of
+	20 lines, as that's what we'll need for the status window anyway.
+	Adjust the flag colours to match change in way of displaying.
+	(update_status): Increase the width of the status window by one
+	cell, we'll also go right up to the edges.  When not in a race,
+	output the type of session; both that and the lap counter are in
+	the flag colour (green, yellow, red).  If there's any message for
+	the flag, output that on the line below and use longer forms.
+	(_update_time): Redraw the bit of the status window that shows the
+	remaining time until the session ends.
+	(update_cell): Update the time.
+	(update_car): Update the time.
+	(clear_car): Update the time.
+	(update_time): External function to update the time.
+	* src/display.h: Update.
+	* src/stream.c (read_stream): Update the time if we ping the server,
+	so we don't ever go too long without doing it.
+
 2005-10-07  Scott James Remnant  <scott@netsplit.com>
 
 	* src/display.c (open_display): Add colours for displaying the

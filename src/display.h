@@ -40,6 +40,7 @@ void update_car    (CurrentState *state, int car);
 void clear_car     (CurrentState *state, int car);
 
 void update_status (CurrentState *state);
+void update_time   (CurrentState *state);
 
 void popup_message (const char *message);
 void close_popup   (void);

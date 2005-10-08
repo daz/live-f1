@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "live-f1.h"
 #include "display.h"
@@ -192,17 +193,68 @@ handle_system_packet (CurrentState *state,
 		}
 
 		break;
+	case SYS_WEATHER:
+		/* Weather Information:
+		 * Format: decimal or string.
+		 * Data: field to be updated.
+		 *
+		 * Indicates a change in the weather; the data field
+		 * indicates which piece of information to change, the
+		 * payload always contains the printed value.  This can be
+		 * combined with the SYS_TIMESTAMP packet to record the
+		 * changing of the data over time.
+		 */
+		switch (packet->data) {
+		case 0:
+			/* Session time remaining.
+			 * This is only sent once a minute in H:MM:SS format,
+			 * we therefore parse it and use it to update our
+			 * own record of when the session is due to end.
+			 *
+			 * It also appears to be sent with a -1 length to
+			 * indicate the passing of the minute; we ignore those
+			 * at the moment.
+			 */
+			if (packet->len > 0) {
+				unsigned int total;
+
+				total = number = 0;
+				for (i = 0; i < packet->len; i++) {
+					if (packet->payload[i] == ':') {
+						total *= 60;
+						total += number;
+						number = 0;
+					} else {
+						number *= 10;
+						number += (packet->payload[i]
+							   - '0');
+					}
+				}
+				total *= 60;
+				total += number;
+
+				state->end_time = time (NULL) + total;
+				update_time (state);
+			}
+			break;
+		default:
+			/* Unhandled field */
+			break;
+		}
+		break;
 	case SYS_TRACK_STATUS:
 		/* Track Status:
 		 * Format: decimal.
 		 * Data: field to be updated.
 		 *
-		 * Indicates a change of the track status; the data field
-		 * appears to allow this to give us multiple values, but
-		 * I've only ever seen it equal 1 and give us the flag.
+		 * Indicates a change in the status of the track; the data
+		 * field indicates which piece of information to change.
 		 */
 		switch (packet->data) {
 		case 1:
+			/* Flag currently in effect.
+			 * Decimal enum value.
+			 */
 			state->flag = packet->payload[0] - '0';
 			update_status (state);
 			break;

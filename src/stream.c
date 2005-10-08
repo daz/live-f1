@@ -35,6 +35,7 @@
 #include <errno.h>
 
 #include "live-f1.h"
+#include "display.h"
 #include "packet.h"
 #include "stream.h"
 
@@ -176,6 +177,8 @@ read_stream (CurrentState *state, int sock)
 		ret = write (sock, buf, sizeof (buf));
 		if (ret < 0)
 			goto error;
+
+		update_time (state);
 
 		timer = 0;
 		return 1;

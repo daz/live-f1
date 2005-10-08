@@ -27,14 +27,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curses.h>
+#include <time.h>
 
 #include "live-f1.h"
 #include "packet.h" /* for packet type */
 #include "display.h"
 
-
-/* Minimum number of cars to assume */
-#define MIN_CARS 20
 
 /* Colours to be allocated, note that this mostly matches the data stream
  * values except that 0 is default text here and empty for the data stream,
@@ -58,6 +56,7 @@ typedef enum {
 
 /* Forward prototypes */
 static void _update_cell (CurrentState *state, int car, int type);
+static void _update_time (CurrentState *state);
 
 
 /* Curses display running */
@@ -107,7 +106,7 @@ open_display (void)
 		attrs[COLOUR_OLD]         = A_DIM;
 		attrs[COLOUR_POPUP]       = A_REVERSE;
 		attrs[COLOUR_GREEN_FLAG]  = A_NORMAL;
-		attrs[COLOUR_YELLOW_FLAG] = A_REVERSE | A_DIM;
+		attrs[COLOUR_YELLOW_FLAG] = A_BOLD;
 		attrs[COLOUR_RED_FLAG]    = A_REVERSE;
 	} else {
 		init_pair (COLOUR_DEFAULT,     COLOR_WHITE,   COLOR_BLACK);
@@ -118,9 +117,9 @@ open_display (void)
 		init_pair (COLOUR_DATA,        COLOR_CYAN,    COLOR_BLACK);
 		init_pair (COLOUR_OLD,         COLOR_YELLOW,  COLOR_BLACK);
 		init_pair (COLOUR_POPUP,       COLOR_WHITE,   COLOR_BLUE);
-		init_pair (COLOUR_GREEN_FLAG,  COLOR_BLACK,   COLOR_GREEN);
-		init_pair (COLOUR_YELLOW_FLAG, COLOR_BLACK,   COLOR_YELLOW);
-		init_pair (COLOUR_RED_FLAG,    COLOR_RED,     COLOR_RED);
+		init_pair (COLOUR_GREEN_FLAG,  COLOR_GREEN,   COLOR_BLACK);
+		init_pair (COLOUR_YELLOW_FLAG, COLOR_YELLOW,  COLOR_BLACK);
+		init_pair (COLOUR_RED_FLAG,    COLOR_RED,     COLOR_BLACK);
 
 		attrs[COLOUR_DEFAULT]     = COLOR_PAIR (COLOUR_DEFAULT);
 		attrs[COLOUR_LATEST]      = COLOR_PAIR (COLOUR_LATEST);
@@ -160,7 +159,7 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	nlines = MAX (state->num_cars, MIN_CARS);
+	nlines = MAX (state->num_cars, 20);
 	for (i = 0; i < state->num_cars; i++)
 		nlines = MAX (nlines, state->car_position[i]);
 	nlines += 1;
@@ -413,6 +412,7 @@ update_cell (CurrentState *state,
 
 	_update_cell (state, car, type);
 
+	_update_time (state);
  	wnoutrefresh (boardwin);
 	doupdate ();
 }
@@ -437,6 +437,7 @@ update_car (CurrentState *state,
 	for (i = 0; i < LAST_CAR_PACKET; i++)
 		_update_cell (state, car, i);
 
+	_update_time (state);
  	wnoutrefresh (boardwin);
 	doupdate ();
 }
@@ -468,6 +469,7 @@ clear_car (CurrentState *state,
 	wmove (boardwin, y, 0);
 	wclrtoeol (boardwin);
 
+	_update_time (state);
 	wnoutrefresh (boardwin);
 	doupdate ();
 }
@@ -491,47 +493,107 @@ update_status (CurrentState *state)
 		if (COLS < 80)
 			return;
 
-		statwin = newwin (nlines, 9, 0, COLS - 9);
+		statwin = newwin (nlines, 10, 0, COLS - 10);
 		wbkgdset (statwin, attrs[COLOUR_DEFAULT]);
 		werase (statwin);
 	}
 
-	/* Output the number of laps */
-	if (state->event_type == RACE_EVENT) {
-		wattrset (statwin, attrs[COLOUR_DEFAULT]);
-		mvwprintw (statwin, 1, 1, "LAP: %3d", state->lap);
-	}
-
-	/* Paint the flag */
-	wmove (statwin, state->event_type == RACE_EVENT ? 2 : 1, 1);
+	/* Output the race status */
+	wmove (statwin, 1, 0);
+	wclrtoeol (statwin);
 	switch (state->flag) {
 	case GREEN_FLAG:
 		wattrset (statwin, attrs[COLOUR_GREEN_FLAG]);
-		waddstr (statwin, "       ");
 		break;
 	case YELLOW_FLAG:
 		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		waddstr (statwin, "       ");
 		break;
 	case SAFETY_CAR_STANDBY:
 		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		waddstr (statwin, "  SCS  ");
+		waddstr (statwin, "SC Standby");
 		break;
 	case SAFETY_CAR_DEPLOYED:
 		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		waddstr (statwin, "  SCD  ");
+		waddstr (statwin, "Safety Car");
 		break;
 	case RED_FLAG:
 		wattrset (statwin, attrs[COLOUR_RED_FLAG]);
-		waddstr (statwin, "STOPPED");
+		waddstr (statwin, "Stopped");
 		break;
 	default:
 		wattrset (statwin, attrs[COLOUR_DEFAULT]);
-		waddstr (statwin, "       ");
 		break;
 	}
 
+	/* Number of laps, or event type (use same colour as flag) */
+	wmove (statwin, 0, 0);
+	wclrtoeol (statwin);
+	switch (state->event_type) {
+	case RACE_EVENT:
+		wprintw (statwin, "Lap %3d", state->lap);
+		break;
+	case PRACTICE_EVENT:
+		wprintw (statwin, "Practice");
+		break;
+	}
+
+	_update_time (state);
+
 	wnoutrefresh (statwin);
+	doupdate ();
+}
+
+/**
+ * _update_time:
+ * @state: application state structure.
+ *
+ * Updates the time in the status window without redrawing the display.
+ **/
+static void
+_update_time (CurrentState *state)
+{
+	time_t remaining;
+
+	if (! statwin)
+		return;
+
+	wmove (statwin, nlines - 1, 0);
+	wattrset (statwin, attrs[COLOUR_DATA]);
+
+	remaining = MAX (state->end_time - time (NULL), 0);
+	if (remaining >= 3600) {
+		wprintw (statwin, "%d:", remaining / 3600);
+		remaining %= 3600;
+		wprintw (statwin, "%02d:", remaining / 60);
+		remaining %= 60;
+		wprintw (statwin, "%02d", remaining);
+	} else if (remaining >= 60) {
+		wprintw (statwin, "  %2d:", remaining / 60);
+		remaining %= 60;
+		wprintw (statwin, "%02d", remaining);
+	} else {
+		wprintw (statwin, "     %2d", remaining);
+	}
+
+	wnoutrefresh (statwin);
+}
+
+/**
+ * update_time:
+ * @state: application state structure.
+ *
+ * External function to update the time, unlike most display functions this
+ * one doesn't clear an open popup as it's not possible for them to ever
+ * cover the time.  It also doesn't open the display if not already done.
+ **/
+void
+update_time (CurrentState *state)
+{
+	if ((! cursed) || (! statwin))
+		return;
+
+	_update_time (state);
+
 	doupdate ();
 }
 
