@@ -627,7 +627,6 @@ close_display (void)
 
 /**
  * should_quit:
- * @wait: whether to wait for the key press.
  *
  * Checks for a key press on the keyboard matching any key we quit for
  * (Enter, Escape, q, etc.).
@@ -635,13 +634,10 @@ close_display (void)
  * Returns: 0 if none were pressed, 1 if one was.
  **/
 int
-should_quit (int wait)
+should_quit (void)
 {
 	if (! cursed)
 		return 0;
-
-	if (wait)
-		nodelay (stdscr, FALSE);
 
 	switch (getch ()) {
 	case KEY_ENTER:

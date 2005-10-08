@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <ne_socket.h>
 
@@ -111,22 +112,37 @@ main (int   argc,
 		return 1;
 
 	for (;;) {
+		int ret;
+
 		sock = open_stream (state->host, 4321);
-		if (sock < 0)
+		if (sock < 0) {
+			close_display ();
+			fprintf (stderr, "%s: %s: %s\n", program_name,
+				 _("unable to open data stream"),
+				 strerror (errno));
 			return 1;
+		}
 
 		reset_decryption (state);
 
-		while (read_stream (state, sock) > 0) {
-			if (should_quit (0)) {
+		while ((ret = read_stream (state, sock)) > 0) {
+			if (should_quit ()) {
 				close_display ();
 				close (sock);
 				return 0;
 			}
 		}
-	}
 
-	return 1;
+		if (ret < 0) {
+			close_display ();
+			fprintf (stderr, "%s: %s: %s\n", program_name,
+				 _("error reading from data stream"),
+				 strerror (errno));
+			return 1;
+		}
+
+		close (sock);
+	}
 }
 
 

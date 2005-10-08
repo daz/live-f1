@@ -32,7 +32,7 @@ int cursed;
 
 void open_display  (void);
 void close_display (void);
-int  should_quit   (int wait);
+int  should_quit   (void);
 
 void clear_board   (CurrentState *state);
 void update_cell   (CurrentState *state, int car, int type);

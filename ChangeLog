@@ -1,5 +1,16 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (should_quit): Remove argument, we're always
+	called in a non-waiting mode now.
+	* src/display.h: Update.
+	* src/stream.c (open_stream): Don't print the reason for failure,
+	just return it.
+	* src/main.c (main): Remove argument from should_quit() call.
+	Close socket before going around the loop again.  Close display
+	and print error when we can't open the data stream.  Check for
+	errors from read_stream() and close display then print the error
+	if one occurs.
+
 	* src/packet.c (handle_system_packet): Close any popup once the
 	countdown begins.
 

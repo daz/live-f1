@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "live-f1.h"
 #include "display.h"
@@ -128,13 +127,8 @@ open_stream (const char   *hostname,
 		break;
 	}
 
-	if (sock < 0) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("failed to connect to data stream"),
-			 strerror (errno));
-	} else {
+	if (sock >= 0)
 		info (2, _("Connected to %s.\n"), addr->ai_canonname);
-	}
 
 	freeaddrinfo (res);
 	return sock;
