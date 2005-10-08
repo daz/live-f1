@@ -178,6 +178,8 @@ main (int   argc,
 				 strerror (errno));
 			return 2;
 		}
+
+		info (1, _("Reconnecting..."));
 	}
 }
 

@@ -1,5 +1,7 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (main): Add a message when we reconnect.
+
 	* src/packet.c (handle_car_packet): During race events, the Interval
 	column of the car in P1 contains the lap number -- parse this to get
 	the current lap and store it in the state.
