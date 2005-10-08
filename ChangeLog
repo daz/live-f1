@@ -1,5 +1,7 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h: Fix comment for PracticeAtomType.
+
 	* README: Update description of the zero key frame, which I'm
 	convinced is something to do with a data-stream-less mode of the Java
 	applet.

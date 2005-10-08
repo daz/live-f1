@@ -59,7 +59,7 @@ typedef enum {
 /**
  * PracticeAtomType:
  *
- * Known types of data atoms for cars during a race event.
+ * Known types of data atoms for cars during a practice or qualifying event.
  **/
 typedef enum {
 	PRACTICE_POSITION = 1,
