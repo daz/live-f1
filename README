@@ -97,15 +97,18 @@ are published as files on the web server.  This means they are fetched
 out of band using HTTP, but should be parsed before reading the data
 stream.
 
-Each key frame is numbered, except for a single master key frame.  The
-data stream contains regular packets indicating the current key frame
-number, including an initial packet that tells you which key frame you
-need to fetch first to get up to speed.
+Each key frame is numbered, starting with a special "zero" key frame.
+The data stream contains regular packets indicating the current key
+frame number, including an initial packet that tells you which key frame
+you need to fetch first to get up to speed.
 
-I'm not entirely sure what the purpose of the master key frame is, as
+I'm not entirely sure what the purpose of the zero key frame is, as
 you can obtain the same information from whatever key frame marker you
-see when you connect to the data stream.  Perhaps they serve a purpose
-at the very start of an event when there may not be any key frames.
+see when you connect to the data stream.  The zero frame always appears
+to be identical to the latest frame, so perhaps they are a way to get
+the data without using the data stream; e.g. in firewalled
+environments.  The help for the Java applet certainly suggests that it
+can do this.
 
   --> GET /keyframe_$frame.bin HTTP/1.1
       Host: live-timing.formula1.com
@@ -116,7 +119,7 @@ at the very start of an event when there may not be any key frames.
       $data
 
 Note that the frame number has a minimum of five digits and should be
-zero-padded for smaller numbers.  To obtain the master key frame, the
+zero-padded for smaller numbers.  To obtain the zero key frame, the
 URL /keyframe.bin should be used instead.
 
 

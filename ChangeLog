@@ -1,5 +1,9 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* README: Update description of the zero key frame, which I'm
+	convinced is something to do with a data-stream-less mode of the Java
+	applet.
+
 	* src/main.c (main): Add a message when we reconnect.
 
 	* src/packet.c (handle_car_packet): During race events, the Interval
