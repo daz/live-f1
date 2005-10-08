@@ -244,6 +244,7 @@ handle_system_packet (CurrentState *state,
 				state->epoch_time = time (NULL);
 			}
 
+			close_popup ();
 			update_time (state);
 			break;
 		default:

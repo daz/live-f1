@@ -1,5 +1,8 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_system_packet): Close any popup once the
+	countdown begins.
+
 	* src/main.c (main): Loop through the process of opening the stream
 	and reading from it forever, or at least until the user presses a
 	key.  That way we handle the server disconnecting us and go back in
