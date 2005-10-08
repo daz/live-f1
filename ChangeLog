@@ -1,5 +1,12 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (EventType): Qualifying has an event type of 4,
+	I guess 3 was used for the old Q1/Q2 system.
+	* src/display.c (clear_board): Use the same headers for qualifying
+	as we do for practice.
+	(_update_cell): Therefore also use the same column settings.
+	(update_status): Show Qualifying during those events.
+
 	* src/main.c (main): No need to close the socket, read_stream()
 	always does before returning.  Fix memset to ensure we zero the
 	entire state array.

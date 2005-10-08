@@ -189,6 +189,7 @@ clear_board (CurrentState *state)
 			   _("Sector 3"), _("Ps"));
 		break;
 	case PRACTICE_EVENT:
+	case QUALIFYING_EVENT:
 		mvwprintw (boardwin, 0, 0,
 			   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
 			   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
@@ -311,6 +312,7 @@ _update_cell (CurrentState *state,
 		}
 		break;
 	case PRACTICE_EVENT:
+	case QUALIFYING_EVENT:
 		switch ((PracticeAtomType) type) {
 		case PRACTICE_POSITION:
 			x = 0;
@@ -534,6 +536,9 @@ update_status (CurrentState *state)
 		break;
 	case PRACTICE_EVENT:
 		wprintw (statwin, "Practice");
+		break;
+	case QUALIFYING_EVENT:
+		wprintw (statwin, "Qualifying");
 		break;
 	}
 

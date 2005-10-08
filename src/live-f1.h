@@ -42,7 +42,8 @@
  **/
 typedef enum {
 	RACE_EVENT = 1,
-	PRACTICE_EVENT = 2
+	PRACTICE_EVENT = 2,
+	QUALIFYING_EVENT = 4
 } EventType;
 
 /**
