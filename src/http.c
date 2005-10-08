@@ -263,7 +263,7 @@ obtain_key_frame (const char   *host,
 			      + MAX (numlen (frame), 5) + 6);
 		sprintf (url, "%s_%05d.bin", KEYFRAME_URL_PREFIX, frame);
 	} else {
-		info (1, _("Obtaining master key frame ...\n"));
+		info (2, _("Obtaining current key frame ...\n"));
 
 		url = malloc (strlen (KEYFRAME_URL_PREFIX) + 5);
 		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);

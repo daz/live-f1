@@ -21,6 +21,14 @@
 # include <config.h>
 #endif /* HAVE_CONFIG_H */
 
+#if HAVE_GETOPT_H
+# include <getopt.h>
+#else /* HAVE_GETOPT_H */
+# include <unistd.h>
+# define getopt_long(argc, argv, optstring, longopts, longindex) \
+		getopt ((argc), (argv), (optstring))
+#endif /* HAVE_GETOPT_H */
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -40,13 +48,23 @@
 
 /* Forward prototypes */
 static void print_version (void);
+static void print_usage (void);
 
 
 /* Program name */
 const char *program_name = NULL;
 
 /* How verbose to be */
-static int verbosity = 3;
+static int verbosity = 0;
+
+/* Command-line options */
+static const char opts[] = "v";
+static const struct option longopts[] = {
+	{ "verbose",	no_argument, NULL, 'v' },
+	{ "help",	no_argument, NULL, 0400 + 'h' },
+	{ "version",	no_argument, NULL, 0400 + 'v' },
+	{ NULL,		no_argument, NULL, 0 }
+};
 
 
 int
@@ -56,13 +74,32 @@ main (int   argc,
 	CurrentState *state;
 	const char   *home_dir;
 	char         *config_file;
-	int           sock;
+	int           opt, sock;
 
 	setlocale (LC_ALL, "");
 	bindtextdomain (PACKAGE, LOCALEDIR);
 	textdomain (PACKAGE);
 
 	program_name = argv[0];
+
+	while ((opt = getopt_long (argc, argv, opts, longopts, NULL)) != -1) {
+		switch (opt) {
+		case 'v':
+			verbosity++;
+			break;
+		case 0400 + 'h':
+			print_usage ();
+			return 0;
+		case 0400 + 'v':
+			print_version ();
+			return 0;
+		case '?':
+			fprintf (stderr,
+				 _("Try `%s --help' for more information.\n"),
+				 program_name);
+			return 1;
+		}
+	}
 
 	home_dir = getenv ("HOME");
 	if (! home_dir) {
@@ -72,6 +109,7 @@ main (int   argc,
 	}
 
 	print_version ();
+	printf ("\n");
 
 	if (ne_sock_init ()) {
 		fprintf (stderr, "%s: %s\n", program_name,
@@ -109,7 +147,7 @@ main (int   argc,
 	state->cookie = obtain_auth_cookie (state->host, state->email,
 					    state->password);
 	if (! state->cookie)
-		return 1;
+		return 2;
 
 	for (;;) {
 		int ret;
@@ -120,7 +158,7 @@ main (int   argc,
 			fprintf (stderr, "%s: %s: %s\n", program_name,
 				 _("unable to open data stream"),
 				 strerror (errno));
-			return 1;
+			return 2;
 		}
 
 		reset_decryption (state);
@@ -138,7 +176,7 @@ main (int   argc,
 			fprintf (stderr, "%s: %s: %s\n", program_name,
 				 _("error reading from data stream"),
 				 strerror (errno));
-			return 1;
+			return 2;
 		}
 
 		close (sock);
@@ -197,5 +235,24 @@ print_version (void)
 	printf (_("This is free software, covered by the GNU General Public License; see the\n"
 		  "source for copying conditions.  There is NO warranty; not even for\n"
 		  "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"));
+}
+
+/**
+ * print_usage:
+ *
+ * Print the program usage instructions to standard output.
+ **/
+static void
+print_usage (void)
+{
+	printf (_("Usage: %s [OPTION]...\n"), program_name);
+	printf (_("Displays live timing data from Formula 1 race, practice and qualifying\n"
+		  "sessions.\n"));
 	printf ("\n");
+	printf (_("Options:\n"
+		  "  -v, --verbose              increase verbosity for each time repeated.\n"
+		  "      --help                 display this help and exit.\n"
+		  "      --version              output version information and exit.\n"));
+	printf ("\n");
+	printf (_("Report bugs to <%s>\n"), PACKAGE_BUGREPORT);
 }

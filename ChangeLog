@@ -1,5 +1,13 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* configure.ac: Check for standard headers and getopt.h, also
+	check for const and size_t.
+	* src/main.c (main): Handle command-line options, and set the default
+	verbosity to zero.
+	(print_usage): Outputs usage instructions.
+	* src/http.c (obtain_key_frame): Adjust message when receiving
+	key frame zero.
+
 	* src/display.c (should_quit): Remove argument, we're always
 	called in a non-waiting mode now.
 	* src/display.h: Update.

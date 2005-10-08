@@ -18,8 +18,12 @@ AC_PROG_CC
 PKG_CHECK_MODULES([NEON], [neon >= 0.24.0])
 
 # Checks for header files.
+AC_HEADER_STDC
+AC_CHECK_HEADERS([getopt.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_TYPE_SIZE_T
 
 # Checks for library functions.
 AC_CHECK_LIB([ncurses], [initscr])
