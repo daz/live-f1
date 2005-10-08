@@ -1,5 +1,11 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (main): No need to close the socket, read_stream()
+	always does before returning.  Fix memset to ensure we zero the
+	entire state array.
+	* src/packet.c (handle_car_packet): Abort if we can't realloc the
+	arrays.
+
 	* configure.ac: Check for standard headers and getopt.h, also
 	check for const and size_t.
 	* src/main.c (main): Handle command-line options, and set the default

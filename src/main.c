@@ -119,7 +119,7 @@ main (int   argc,
 
 
 	state = malloc (sizeof (CurrentState));
-	memset (state, 0, sizeof (state));
+	memset (state, 0, sizeof (CurrentState));
 	state->host = NULL;
 	state->email = NULL;
 	state->password = NULL;
@@ -178,8 +178,6 @@ main (int   argc,
 				 strerror (errno));
 			return 2;
 		}
-
-		close (sock);
 	}
 }
 

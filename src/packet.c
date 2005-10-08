@@ -60,11 +60,16 @@ handle_car_packet (CurrentState *state,
 					       sizeof (int) * packet->car);
 		state->car_info = realloc (state->car_info,
 					   sizeof (CarAtom *) * packet->car);
+		if ((! state->car_position) || (! state->car_info))
+			abort ();
 
 		for (i = state->num_cars; i < packet->car; i++) {
 			state->car_position[i] = 0;
 			state->car_info[i] = malloc (sizeof (CarAtom)
 						     * LAST_CAR_PACKET);
+			if (! state->car_info[i])
+				abort ();
+
 			for (j = 0; j < LAST_CAR_PACKET; j++)
 				memset (&state->car_info[i][j], 0,
 					sizeof (CarAtom));
