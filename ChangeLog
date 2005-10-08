@@ -1,5 +1,9 @@
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_car_packet): During race events, the Interval
+	column of the car in P1 contains the lap number -- parse this to get
+	the current lap and store it in the state.
+
 	* src/live-f1.h (EventType): Qualifying has an event type of 4,
 	I guess 3 was used for the old Q1/Q2 system.
 	* src/display.c (clear_board): Use the same headers for qualifying

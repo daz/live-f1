@@ -120,6 +120,21 @@ handle_car_packet (CurrentState *state,
 			strcpy (atom->text, (const char *) packet->payload);
 
 		update_cell (state, packet->car, packet->type);
+
+		/* This is the only way to grab this information, sadly */
+		if ((state->event_type == RACE_EVENT)
+		    && (state->car_position[packet->car - 1] == 1)
+		    && (packet->type == RACE_INTERVAL)) {
+			unsigned int number = 0;
+
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				number += packet->payload[i] - '0';
+			}
+
+			state->lap = number;
+			update_status (state);
+		}
 		break;
 	}
 }
