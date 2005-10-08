@@ -110,23 +110,23 @@ main (int   argc,
 	if (! state->cookie)
 		return 1;
 
-	sock = open_stream (state->host, 4321);
-	if (sock < 0)
-		return 1;
+	for (;;) {
+		sock = open_stream (state->host, 4321);
+		if (sock < 0)
+			return 1;
 
-	reset_decryption (state);
+		reset_decryption (state);
 
-	while (read_stream (state, sock) > 0) {
-		if (should_quit (0))
-			goto exit;
+		while (read_stream (state, sock) > 0) {
+			if (should_quit (0)) {
+				close_display ();
+				close (sock);
+				return 0;
+			}
+		}
 	}
 
-	should_quit (1);
-exit:
-	close_display ();
-	close (sock);
-
-	return 0;
+	return 1;
 }
 
 
