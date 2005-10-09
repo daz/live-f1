@@ -1,5 +1,11 @@
 2005-10-09  Scott James Remnant  <scott@netsplit.com>
 
+	* src/stream.c (read_stream): Re-work after reading the book on
+	poll(), always use read() and write() to get the actual socket errors
+	rather than trying to divine them from poll's erratic return events.
+	* src/main.c (main): Close the socket before reconnecting now that
+	read_stream() doesn't for us.
+
 	* src/packet.h (RaceAtomType): The inter-sector columns actually
 	tell us which lap they went into the pits, and the sector time
 	becomes the time in the pits.

@@ -179,7 +179,8 @@ main (int   argc,
 			return 2;
 		}
 
-		info (1, _("Reconnecting..."));
+		close (sock);
+		info (1, _("Reconnecting ...\n"));
 	}
 }
 

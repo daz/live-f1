@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <errno.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -151,16 +152,29 @@ read_stream (CurrentState *state, int sock)
 {
 	struct pollfd poll_fd;
 	static int    timer = 0;
-	int           ret;
+	int           numr, len;
 
 	poll_fd.fd = sock;
 	poll_fd.events = POLLIN;
 	poll_fd.revents = 0;
 
-	ret = poll (&poll_fd, 1, 100);
-	if (ret < 0) {
-		goto error;
-	} else if (ret == 0) {
+	numr = poll (&poll_fd, 1, 100);
+	if (numr > 0) {
+		unsigned char buf[512];
+
+		len = read (sock, buf, sizeof (buf));
+		if (len > 0) {
+			parse_stream_block (state, buf, len);
+			timer = 0;
+			return len;
+		} else if ((len < 0) && (errno != ECONNRESET)) {
+			return -1;
+		} else {
+			return 0;
+		}
+	} else if (numr < 0) {
+		return -1;
+	} else {
 		char buf[1];
 
 		if (timer++ < 10)
@@ -168,46 +182,17 @@ read_stream (CurrentState *state, int sock)
 
 		/* Wake the server up */
 		buf[0] = 0x10;
-		ret = write (sock, buf, sizeof (buf));
-		if (ret < 0)
-			goto error;
-
-		update_time (state);
-
-		timer = 0;
-		return 1;
-	}
-
-	/* Error condition */
-	if (poll_fd.revents & (POLLERR | POLLNVAL))
-		goto error;
-
-	/* Server went away */
-	if (poll_fd.revents & POLLHUP) {
-		close (sock);
-		return 0;
-	}
-
-	/* Yay, data! */
-	if (poll_fd.revents & POLLIN) {
-		unsigned char buf[512];
-
-		ret = read (sock, buf, sizeof (buf));
-		if (ret < 0) {
-			goto error;
-		} else if (ret == 0) {
-			close (sock);
+		len = write (sock, buf, sizeof (buf));
+		if (len > 0) {
+			update_time (state);
+			timer = 0;
+			return len;
+		} else if ((len < 0) && (errno != EPIPE)) {
+			return -1;
+		} else {
 			return 0;
 		}
-
-		parse_stream_block (state, buf, ret);
 	}
-
-	timer = 0;
-	return ret;
-error:
-	close (sock);
-	return -1;
 }
 
 /**
