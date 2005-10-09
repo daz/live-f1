@@ -1,3 +1,10 @@
+2005-10-09  Scott James Remnant  <scott@netsplit.com>
+
+	* src/packet.h (RaceAtomType): The inter-sector columns actually
+	tell us which lap they went into the pits, and the sector time
+	becomes the time in the pits.
+	* src/display.c (_update_cell): Update enum values.
+
 2005-10-08  Scott James Remnant  <scott@netsplit.com>
 
 	* src/packet.h: Fix comment for PracticeAtomType.

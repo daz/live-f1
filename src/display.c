@@ -277,7 +277,7 @@ _update_cell (CurrentState *state,
 			sz = 4;
 			align = 1;
 			break;
-		case RACE_LAP_STOP:
+		case RACE_PIT_LAP_1:
 			x = 45;
 			sz = 3;
 			align = -1;
@@ -287,7 +287,7 @@ _update_cell (CurrentState *state,
 			sz = 4;
 			align = 1;
 			break;
-		case RACE_LAP_IN_PIT:
+		case RACE_PIT_LAP_2:
 			x = 54;
 			sz = 3;
 			align = -1;
@@ -297,7 +297,7 @@ _update_cell (CurrentState *state,
 			sz = 4;
 			align = 1;
 			break;
-		case RACE_LAP_OUT:
+		case RACE_PIT_LAP_3:
 			x = 63;
 			sz = 3;
 			align = -1;
