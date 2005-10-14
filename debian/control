@@ -1,0 +1,18 @@
+Source: live-f1
+Section: misc
+Priority: optional
+Maintainer: Fabio M. Di Nitto <fabbione@ubuntu.com>
+Standards-Version: 3.6.2
+Build-Depends: debhelper (>= 4.2.28), libncurses5-dev, libneon24-dev, libssl-dev, libxml2-dev, zlib1g-dev
+
+Package: live-f1
+Section: misc
+Priority: optional
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: formula1.com text based client
+ This tiny client is capable of grab and display the real time stream
+ from formula1.com without the need of a java-enabled browser.
+ .
+ NOTE: this software requires an account on formula1.com and it is still
+ experimental.

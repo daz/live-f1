@@ -1,0 +1,81 @@
+#!/usr/bin/make -f
+
+# Uncomment this to turn on verbose mode.
+# export DH_VERBOSE=1
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+
+	if [ ! -x configure ]; then \
+	  if [ ! -x /usr/bin/autoreconf ]; then \
+	    echo "Hey dude.. gimme a break.. you need to autoreconf the source!"; \
+	    exit 1; \
+	  else \
+	    echo "Dude.. you should do this stuff before release.."; \
+	    autoreconf --install --force --verbose; \
+	    touch OMG-AUTORECONF; \
+	  fi \
+	fi
+
+	./configure --prefix=/usr
+
+	touch $@
+
+build: configure build-stamp
+build-stamp:
+	dh_testdir
+
+	$(MAKE)
+
+	touch $@
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+
+	$(MAKE) install DESTDIR=`pwd`/debian/live-f1/
+
+	dh_installdocs README ChangeLog AUTHORS
+	dh_installchangelogs
+
+
+binary-arch: install
+	dh_testdir
+	dh_testroot
+	dh_strip -a
+	dh_compress -a
+	dh_fixperms -a
+	dh_installdeb -a
+	dh_shlibdeps -a
+	dh_gencontrol -a
+	dh_md5sums -a
+	dh_builddeb -a
+
+binary-indep: install
+	#nothing to do
+
+binary: binary-arch binary-indep
+
+clean: 
+	dh_testdir
+	dh_testroot
+	dh_clean
+
+	rm -rf *-stamp
+	-$(MAKE) clean
+	if [ -f OMG-AUTORECONF ]; then \
+	  make distclean || true; \
+	  rm -rf autom4te.cache config.{guess,rpath,status,sub} \
+		install-sh configure depcomp missing mkinstalldirs \
+		ABOUT-NLS aclocal.m4 config.h.in \
+		INSTALL Makefile.in OMG-AUTORECONF \
+		intl src/Makefile.in \
+		m4/{xsize,wint_t,wchar_t,ulonglong,uintmax_t,stdint_h,size_max,signed}.m4 \
+		m4/{progtest,printf-posix,po,nls,longlong,longdouble,lib-prefix,lib-link}.m4 \
+		m4/{lib-ld,lcmessage,isc-posix,inttypes_h,inttypes,inttypes-pri,intmax}.m4 \
+		m4/{intdiv0,iconv,glibc21,glibc2,gettext,codeset}.m4 \
+		po/{stamp-po,remove-potcdate.sin,quot.sed,live-f1.pot,insert-header.sin} \
+		po/{en@quot.header,en@boldquot.header,boldquot.sed,Rules-quot,Makevars.template,Makefile.in.in}; \
+	fi
