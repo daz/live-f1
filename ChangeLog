@@ -1,5 +1,7 @@
 2005-10-15  Scott James Remnant  <scott@netsplit.com>
 
+	* TODO: Added notes of what I want fixed before release.
+
 	* src/main.c (main): Reset the state structure after connecting
 	to the stream, clearing out any previous event information so we
 	come at the new data fresh.

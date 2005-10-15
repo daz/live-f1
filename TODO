@@ -1,0 +1,43 @@
+Before first release:
+
+ * Identify a way of noticing when we haven't got the right decryption
+   and bailing out -- instead of displaying junk.
+
+ * Replace numeric parsing code with something a little less primitive
+   and more robust.
+
+ * Make sure we handle an event starting while we're running
+   correctly; and don't end up displaying garbage.
+
+ * Less evil config-file code.
+
+ * Less evil "get user's registration details" code.
+
+ * Don't display the user's password while they type it.
+
+ * Registration within the client.
+
+ * Character set conversion for notices and such, so we display ®
+   instead of the block in the "no timing yet" message.
+
+ * Manual Page.
+
+
+Sometime after:
+
+ * Record/playback functionality for events that your TV provider
+   doesn't transmit live -- pause, fast forward and rewind within the
+   client too.  (Live Pause? :p)
+
+ * Do SOMETHING with the weather data, and position history data, just
+   displaying the current values isn't interesting; it's the trends
+   that matter.
+
+ * Keep the history of all the results for each driver, now we have a
+   pretty good idea what they all mean; allow the user to cursor to a
+   driver on the board and use PgUp/PgDn to scroll through the
+   history.
+
+ * Find somewhere to put the commentary.
+
+ * GTK+ ui?
