@@ -1,5 +1,13 @@
 2005-10-15  Scott James Remnant  <scott@netsplit.com>
 
+	* TODO: Added notes of what I want fixed before release.
+
+	* src/main.c (main): Reset the state structure after connecting
+	to the stream, clearing out any previous event information so we
+	come at the new data fresh.
+	* src/packet.c (handle_system_packet): Reset the flag to green
+	at the start of a new event.
+
 	* src/stream.c (read_stream): Don't bomb out when our syscalls are
 	interrupted by signal, instead just come back later and carry on.
 	* src/display.c (should_quit): Rename to handle_keys, return < 0
