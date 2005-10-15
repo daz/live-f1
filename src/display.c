@@ -641,7 +641,7 @@ close_display (void)
  * Returns: 0 if none were pressed, 1 if one was, -1 if should quit.
  **/
 int
-should_quit (CurrentState *state)
+handle_keys (CurrentState *state)
 {
 	if (! cursed)
 		return 0;
