@@ -175,6 +175,7 @@ handle_system_packet (CurrentState *state,
 		state->epoch_time = 0;
 		state->remaining_time = 0;
 		state->lap = 0;
+		state->flag = GREEN_FLAG;
 		state->num_cars = 0;
 		if (state->car_position) {
 			free (state->car_position);

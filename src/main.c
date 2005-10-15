@@ -161,6 +161,24 @@ main (int   argc,
 			return 2;
 		}
 
+		state->key = 0;
+		state->frame = 0;
+		state->event_no = 0;
+		state->event_type = RACE_EVENT;
+		state->epoch_time = 0;
+		state->remaining_time = 0;
+		state->lap = 0;
+		state->flag = GREEN_FLAG;
+		state->num_cars = 0;
+		if (state->car_position) {
+			free (state->car_position);
+			state->car_position = NULL;
+		}
+		if (state->car_info) {
+			free (state->car_info);
+			state->car_info = NULL;
+		}
+
 		reset_decryption (state);
 
 		while ((ret = read_stream (state, sock)) > 0) {
