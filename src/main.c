@@ -164,7 +164,7 @@ main (int   argc,
 		reset_decryption (state);
 
 		while ((ret = read_stream (state, sock)) > 0) {
-			if (should_quit ()) {
+			if (handle_keys (state) < 0) {
 				close_display ();
 				close (sock);
 				return 0;

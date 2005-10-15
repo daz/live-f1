@@ -168,11 +168,17 @@ read_stream (CurrentState *state, int sock)
 			timer = 0;
 			return len;
 		} else if ((len < 0) && (errno != ECONNRESET)) {
+			if (errno == EINTR)
+				return 1;
+
 			return -1;
 		} else {
 			return 0;
 		}
 	} else if (numr < 0) {
+		if (errno == EINTR)
+			return 1;
+
 		return -1;
 	} else {
 		char buf[1];
@@ -188,6 +194,9 @@ read_stream (CurrentState *state, int sock)
 			timer = 0;
 			return len;
 		} else if ((len < 0) && (errno != EPIPE)) {
+			if (errno == EINTR)
+				return 1;
+
 			return -1;
 		} else {
 			return 0;

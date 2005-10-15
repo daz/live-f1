@@ -1,3 +1,14 @@
+2005-10-15  Scott James Remnant  <scott@netsplit.com>
+
+	* src/stream.c (read_stream): Don't bomb out when our syscalls are
+	interrupted by signal, instead just come back later and carry on.
+	* src/display.c (should_quit): Rename to handle_keys, return < 0
+	when should quit, > 0 on any other key.  Handle the KEY_RESIZE
+	event by clearing the board.
+	* src/display.h: Update.
+	* src/main.c (main): Call handle_keys function rather than
+	should_quit.
+
 2005-10-09  Scott James Remnant  <scott@netsplit.com>
 
 	* src/stream.c (read_stream): Re-work after reading the book on

@@ -631,15 +631,17 @@ close_display (void)
 }
 
 /**
- * should_quit:
+ * handle_keys:
+ * @state: application state structure.
  *
- * Checks for a key press on the keyboard matching any key we quit for
- * (Enter, Escape, q, etc.).
+ * Checks for a key press on the keyboard and handles it; this includes
+ * keys that should quit the app (Enter, Escape, q, etc.) and pseudo-keys
+ * like the resize event.
  *
- * Returns: 0 if none were pressed, 1 if one was.
+ * Returns: 0 if none were pressed, 1 if one was, -1 if should quit.
  **/
 int
-should_quit (void)
+should_quit (CurrentState *state)
 {
 	if (! cursed)
 		return 0;
@@ -651,6 +653,9 @@ should_quit (void)
 	case 0x1b: /* Escape */
 	case 'q':
 	case 'Q':
+		return -1;
+	case KEY_RESIZE:
+		clear_board (state);
 		return 1;
 	default:
 		return 0;
