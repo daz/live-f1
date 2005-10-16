@@ -13,8 +13,6 @@ Before first release:
 
  * Less evil "get user's registration details" code.
 
- * Don't display the user's password while they type it.
-
  * Registration within the client.
 
  * Character set conversion for notices and such, so we display ®
