@@ -34,12 +34,15 @@
 
 #include <curses.h>
 
+#include <fcntl.h>
+#include <termios.h>
+
 #include "live-f1.h"
 #include "cfgfile.h"
 
 
 /* Forward prototypes */
-static char *fgets_alloc (FILE *stream);
+static char *fgets_alloc (FILE *stream, bool hide);
 
 
 /**
@@ -70,7 +73,7 @@ read_config (CurrentState *state,
 		}
 	}
 
-	while ((line = fgets_alloc (cfgf)) != NULL) {
+	while ((line = fgets_alloc (cfgf, FALSE)) != NULL) {
 		char *ptr;
 
 		++lineno;
@@ -116,6 +119,7 @@ read_config (CurrentState *state,
 /**
  * fgets_alloc:
  * @stream: stdio stream to read from.
+ * @hide: when set to true, it will not show typing.
  *
  * Reads from stream up to EOF or a newline, without any line-length
  * limitations.
@@ -125,11 +129,39 @@ read_config (CurrentState *state,
  * was read.
  **/
 static char *
-fgets_alloc (FILE *stream)
+fgets_alloc (FILE *stream, bool hide)
 {
 	static char   *buf = NULL;
 	static size_t  buf_sz = 0;
 	size_t         buf_len = 0;
+
+	/* termios stuff to hide the passphrase */
+	int fd;
+	struct termios oldterm;
+	struct termios newterm;
+	
+	if (hide == TRUE)
+	{
+		fd=open("/dev/tty",O_NONBLOCK);
+		if (fd == -1)
+		{
+			printf("ARGH! Cannot open /dev/tty to hide typing!\n");
+		}
+		if (tcgetattr(fd, &oldterm) == -1)
+		{
+			printf("ARGH! Cannot retrive terminal information!\n");
+		}
+
+		/* setting flags - we hide everything other than newline (stolen from shadow) */
+		newterm=oldterm;
+		newterm.c_lflag &= ~(ECHO | ECHOE | ECHOK);
+		newterm.c_lflag |= ECHONL;
+
+		if (tcsetattr(fd, TCSANOW, &newterm) == -1)
+		{
+			printf("ARGH! Cannot set terminal information!\n");
+		}
+	}
 
 	for (;;) {
 		char *ret, *pos;
@@ -156,6 +188,17 @@ fgets_alloc (FILE *stream)
 		}
 	}
 
+	if (hide == TRUE)
+	{
+		if (tcsetattr(fd, TCSANOW, &oldterm) == -1)
+		{
+			printf("ARGH! Cannot restore terminal information!\n");
+			/* how are we supposed to catch this one.. no idea ;) */
+		}
+		close(fd);
+	}
+
+	
 	return buf;
 }
 
@@ -239,7 +282,7 @@ get_config (CurrentState *state)
 	printf ("http://www.formula1.com/livetiming_registration/\n");
 	printf ("\n");
 	printf (_("Enter your registered e-mail address: "));
-	answer = fgets_alloc (stdin);
+	answer = fgets_alloc (stdin, FALSE);
 	if (answer) {
 		free (state->email);
 		state->email = strdup (answer);
@@ -248,7 +291,7 @@ get_config (CurrentState *state)
 	}
 
 	printf (_("Enter your registered password: "));
-	answer = fgets_alloc (stdin);
+	answer = fgets_alloc (stdin, TRUE);
 	if (answer) {
 		free (state->password);
 		state->password = strdup (answer);
