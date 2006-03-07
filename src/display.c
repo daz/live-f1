@@ -2,7 +2,7 @@
  *
  * display.c - displaying of timing and messages
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -159,7 +159,7 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	nlines = MAX (state->num_cars, 20);
+	nlines = MAX (state->num_cars, 22);
 	for (i = 0; i < state->num_cars; i++)
 		nlines = MAX (nlines, state->car_position[i]);
 	nlines += 1;

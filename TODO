@@ -1,4 +1,8 @@
-Before first release:
+High Priority:
+
+ * Looks like the web site is changing logins to https://secure.formula1.com/
+   we'll need to follow suit to be "compatible", though for now the old http
+   location still works.
 
  * Identify a way of noticing when we haven't got the right decryption
    and bailing out -- instead of displaying junk.
@@ -18,10 +22,13 @@ Before first release:
  * Character set conversion for notices and such, so we display ®
    instead of the block in the "no timing yet" message.
 
+ * Proper state structures, and callbacks; rather than the intertwined
+   mess we have at the moment.
+
  * Manual Page.
 
 
-Sometime after:
+Wishlists:
 
  * Record/playback functionality for events that your TV provider
    doesn't transmit live -- pause, fast forward and rewind within the

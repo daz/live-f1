@@ -1,3 +1,19 @@
+2006-03-07  Scott James Remnant  <scott@netsplit.com>
+
+	* configure.ac: Bump version to 0.2.0, we'll make a release now
+	for the Bahrain practice sessions and update it as we go.
+	* NEWS: Update.
+	* TODO: Mention that we want a proper state engine.
+
+	* src/main.c (print_version): Update copyright year as this is the
+	printed version.
+
+	* src/display.c (clear_board): Increase default number of
+	cars to 22, to give enough room for Super Aguri; it doesn't make
+	any real difference (the table size gets increased anyway) but is
+	a little more efficient.  If we get a 12th team, it's time to switch
+	to that GTK+ UI as there aren't any more terminal lines left.
+
 2005-10-15  Scott James Remnant  <scott@netsplit.com>
 
 	* TODO: Added notes of what I want fixed before release.
