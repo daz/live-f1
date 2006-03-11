@@ -46,6 +46,7 @@ typedef enum {
 	COLOUR_RECORD,
 	COLOUR_DATA,
 	COLOUR_OLD,
+	COLOUR_ELIMINATED,
 	COLOUR_POPUP,
 	COLOUR_GREEN_FLAG,
 	COLOUR_YELLOW_FLAG,
@@ -104,6 +105,7 @@ open_display (void)
 		attrs[COLOUR_RECORD]      = A_STANDOUT | A_BOLD;
 		attrs[COLOUR_DATA]        = A_NORMAL;
 		attrs[COLOUR_OLD]         = A_DIM;
+		attrs[COLOUR_ELIMINATED]  = A_DIM;
 		attrs[COLOUR_POPUP]       = A_REVERSE;
 		attrs[COLOUR_GREEN_FLAG]  = A_NORMAL;
 		attrs[COLOUR_YELLOW_FLAG] = A_BOLD;
@@ -116,6 +118,7 @@ open_display (void)
 		init_pair (COLOUR_RECORD,      COLOR_MAGENTA, COLOR_BLACK);
 		init_pair (COLOUR_DATA,        COLOR_CYAN,    COLOR_BLACK);
 		init_pair (COLOUR_OLD,         COLOR_YELLOW,  COLOR_BLACK);
+		init_pair (COLOUR_ELIMINATED,  COLOR_BLACK,   COLOR_BLACK);
 		init_pair (COLOUR_POPUP,       COLOR_WHITE,   COLOR_BLUE);
 		init_pair (COLOUR_GREEN_FLAG,  COLOR_GREEN,   COLOR_BLACK);
 		init_pair (COLOUR_YELLOW_FLAG, COLOR_YELLOW,  COLOR_BLACK);
@@ -128,6 +131,7 @@ open_display (void)
 		attrs[COLOUR_RECORD]      = COLOR_PAIR (COLOUR_RECORD);
 		attrs[COLOUR_DATA]        = COLOR_PAIR (COLOUR_DATA);
 		attrs[COLOUR_OLD]         = COLOR_PAIR (COLOUR_OLD);
+		attrs[COLOUR_ELIMINATED]  = COLOR_PAIR (COLOUR_ELIMINATED) | A_BOLD;
 		attrs[COLOUR_POPUP]       = COLOR_PAIR (COLOUR_POPUP) | A_BOLD;
 		attrs[COLOUR_GREEN_FLAG]  = COLOR_PAIR (COLOUR_GREEN_FLAG);
 		attrs[COLOUR_YELLOW_FLAG] = COLOR_PAIR (COLOUR_YELLOW_FLAG);
@@ -189,11 +193,17 @@ clear_board (CurrentState *state)
 			   _("Sector 3"), _("Ps"));
 		break;
 	case PRACTICE_EVENT:
-	case QUALIFYING_EVENT:
 		mvwprintw (boardwin, 0, 0,
 			   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
 			   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
 			   _("Sec 1"), _("Sec 2"), _("Sec 3"), _("Laps"));
+		break;
+	case QUALIFYING_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
+			   _("P"), _(""), _("Name"), _("Period 1"),
+			   _("Pediod 2"), _("Period 3"), _("Sec 1"),
+			   _("Sec 2"), _("Sec 3"), _("Ls"));
 		break;
 	}
 
@@ -312,7 +322,6 @@ _update_cell (CurrentState *state,
 		}
 		break;
 	case PRACTICE_EVENT:
-	case QUALIFYING_EVENT:
 		switch ((PracticeAtomType) type) {
 		case PRACTICE_POSITION:
 			x = 0;
@@ -357,6 +366,62 @@ _update_cell (CurrentState *state,
 		case PRACTICE_LAPS:
 			x = 55;
 			sz = 4;
+			align = 1;
+			break;
+		default:
+			return;
+		}
+		break;
+	case QUALIFYING_EVENT:
+		switch ((QualifyingAtomType) type) {
+		case QUALIFYING_POSITION:
+			x = 0;
+			sz = 2;
+			align = 1;
+			break;
+		case QUALIFYING_NUMBER:
+			x = 3;
+			sz = 2;
+			align = 1;
+			break;
+		case QUALIFYING_DRIVER:
+			x = 6;
+			sz = 14;
+			align = -1;
+			break;
+		case QUALIFYING_PERIOD_1:
+			x = 21;
+			sz = 8;
+			align = 1;
+			break;
+		case QUALIFYING_PERIOD_2:
+			x = 30;
+			sz = 8;
+			align = 1;
+			break;
+		case QUALIFYING_PERIOD_3:
+			x = 39;
+			sz = 8;
+			align = 1;
+			break;
+		case QUALIFYING_SECTOR_1:
+			x = 48;
+			sz = 5;
+			align = 1;
+			break;
+		case QUALIFYING_SECTOR_2:
+			x = 54;
+			sz = 5;
+			align = 1;
+			break;
+		case QUALIFYING_SECTOR_3:
+			x = 60;
+			sz = 5;
+			align = 1;
+			break;
+		case QUALIFYING_LAPS:
+			x = 66;
+			sz = 2;
 			align = 1;
 			break;
 		default:

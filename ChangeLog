@@ -1,5 +1,17 @@
 2006-03-11  Scott James Remnant  <scott@netsplit.com>
 
+	* src/live-f1.h (EventType): Qualifying has changed to event
+	type 3 this year.
+	* src/packet.h (QualifyingAtomType): Also has its own headers and
+	doesn't just reuse the practice ones; seems to be three columns
+	for the period times, and the usual three sector columns.
+	* src/display.c (clear_board): Write different headers out.
+	(_update_cell): Handle the new qualy table format.
+	(TextColour): Add new "eliminated" colour used after people have
+	been knocked out of qualifying, otherwise we end up leaking into
+	our own colours.
+	(open_display): Define eliminated colour.
+
 	* src/cfgfile.c: Include unistd.h for definition of close().
 
 2006-03-07  Scott James Remnant  <scott@netsplit.com>

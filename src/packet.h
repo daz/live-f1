@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ typedef enum {
 /**
  * PracticeAtomType:
  *
- * Known types of data atoms for cars during a practice or qualifying event.
+ * Known types of data atoms for cars during a practice event.
  **/
 typedef enum {
 	PRACTICE_POSITION = 1,
@@ -74,6 +74,25 @@ typedef enum {
 	PRACTICE_UNKNOWN,
 	LAST_PRACTICE
 } PracticeAtomType;
+
+/**
+ * QualifyingAtomType:
+ *
+ * Known types of data atoms for cars during a qualifying event.
+ **/
+typedef enum {
+	QUALIFYING_POSITION = 1,
+	QUALIFYING_NUMBER,
+	QUALIFYING_DRIVER,
+	QUALIFYING_PERIOD_1,
+	QUALIFYING_PERIOD_2,
+	QUALIFYING_PERIOD_3,
+	QUALIFYING_SECTOR_1,
+	QUALIFYING_SECTOR_2,
+	QUALIFYING_SECTOR_3,
+	QUALIFYING_LAPS,
+	LAST_QUALIFYING
+} QualifyingAtomType;
 
 
 /**

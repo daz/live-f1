@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@
 typedef enum {
 	RACE_EVENT = 1,
 	PRACTICE_EVENT = 2,
-	QUALIFYING_EVENT = 4
+	QUALIFYING_EVENT = 3
 } EventType;
 
 /**
