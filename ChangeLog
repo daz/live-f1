@@ -1,5 +1,8 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* configure.ac: Bump version to 0.2.5.
+	* NEWS: Update.
+
 	* src/display.c (_update_time): Halt the remaining time countdown
 	while under a red flag.
 

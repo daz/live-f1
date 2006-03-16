@@ -1,3 +1,14 @@
+0.2.5  2006-03-16  "Lift me up"
+
+	* Fixed Bug #34327: now compiles with libneon25.
+
+	* Support for the new knock-out qualifying format is added.
+
+	* Authorisation and the decryption cookie are now obtained
+	from the secure web server.
+
+	* Remaining time countdown is stopped during a red flag.
+
 0.2.0  2006-03-07  "Let's get it started"
 
 	* Initial public release.
