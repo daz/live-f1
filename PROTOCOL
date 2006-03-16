@@ -143,8 +143,11 @@ the cookie by constructing a POST to the right URL with the e-mail
 address and password obtained from the user.  The cookie is returned
 in the standard Set-Cookie header.
 
+This may currently be performed on both the live-timing.formula1.com
+http host and the secure.formula1.com https host.
+
   --> POST /reg/login.asp HTTP/1.1
-      Host: live-timing.formula1.com
+      Host: secure.formula1.com
       Content-Type: application/x-www-form-urlencoded
       Content-Length: $len
 
@@ -167,7 +170,7 @@ constructed, the filename portion is the session number and the
 authorisation cookie is passed as a query parameter.
 
   --> GET /reg/getkey/$session.asp?auth=$cookie HTTP/1.1
-      Host: live-timing.formula1.com
+      Host: secure.formula1.com
 
   <-- HTTP/1.1 200 OK
       Content-Type: text/html

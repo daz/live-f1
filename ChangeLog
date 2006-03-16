@@ -1,5 +1,9 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* README: Rename to PROTOCOL.
+	* PROTOCOL: Mention the new secure host and change the examples
+	to match.
+
 	* configure.ac: Check for ne_has_support() and ne_get_response_header()
 	functions in libneon, these are new with 0.25 and replace functions
 	from 0.24 we were using.  Support both rather than dropping 0.24
