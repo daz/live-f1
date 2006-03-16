@@ -43,7 +43,7 @@
 
 
 /* Forward prototypes */
-static char *fgets_alloc (FILE *stream, bool hide);
+static char *fgets_alloc (FILE *stream);
 
 
 /**
@@ -74,7 +74,7 @@ read_config (CurrentState *state,
 		}
 	}
 
-	while ((line = fgets_alloc (cfgf, FALSE)) != NULL) {
+	while ((line = fgets_alloc (cfgf)) != NULL) {
 		char *ptr;
 
 		++lineno;
@@ -123,7 +123,6 @@ read_config (CurrentState *state,
 /**
  * fgets_alloc:
  * @stream: stdio stream to read from.
- * @hide: when set to true, it will not show typing.
  *
  * Reads from stream up to EOF or a newline, without any line-length
  * limitations.
@@ -133,39 +132,11 @@ read_config (CurrentState *state,
  * was read.
  **/
 static char *
-fgets_alloc (FILE *stream, bool hide)
+fgets_alloc (FILE *stream)
 {
 	static char   *buf = NULL;
 	static size_t  buf_sz = 0;
 	size_t         buf_len = 0;
-
-	/* termios stuff to hide the passphrase */
-	int fd;
-	struct termios oldterm;
-	struct termios newterm;
-	
-	if (hide == TRUE)
-	{
-		fd=open("/dev/tty",O_NONBLOCK);
-		if (fd == -1)
-		{
-			printf("ARGH! Cannot open /dev/tty to hide typing!\n");
-		}
-		if (tcgetattr(fd, &oldterm) == -1)
-		{
-			printf("ARGH! Cannot retrive terminal information!\n");
-		}
-
-		/* setting flags - we hide everything other than newline (stolen from shadow) */
-		newterm=oldterm;
-		newterm.c_lflag &= ~(ECHO | ECHOE | ECHOK);
-		newterm.c_lflag |= ECHONL;
-
-		if (tcsetattr(fd, TCSANOW, &newterm) == -1)
-		{
-			printf("ARGH! Cannot set terminal information!\n");
-		}
-	}
 
 	for (;;) {
 		char *ret, *pos;
@@ -192,17 +163,6 @@ fgets_alloc (FILE *stream, bool hide)
 		}
 	}
 
-	if (hide == TRUE)
-	{
-		if (tcsetattr(fd, TCSANOW, &oldterm) == -1)
-		{
-			printf("ARGH! Cannot restore terminal information!\n");
-			/* how are we supposed to catch this one.. no idea ;) */
-		}
-		close(fd);
-	}
-
-	
 	return buf;
 }
 
@@ -279,14 +239,17 @@ write_config (CurrentState *state,
 int
 get_config (CurrentState *state)
 {
-	char *answer;
+	struct termios  oldterm;
+	struct termios  newterm;
+	int             termfd;
+	char           *answer;
 
 	printf (_("In order to connect to the Live Timing stream, you need to be registered;\n"
 		  "if you've not yet done so, do so now by filling in the form at the URL:\n"));
 	printf ("http://www.formula1.com/livetiming_registration/\n");
 	printf ("\n");
 	printf (_("Enter your registered e-mail address: "));
-	answer = fgets_alloc (stdin, FALSE);
+	answer = fgets_alloc (stdin);
 	if (answer) {
 		free (state->email);
 		state->email = strdup (answer);
@@ -294,8 +257,33 @@ get_config (CurrentState *state)
 		return 1;
 	}
 
+	termfd = open ("/dev/tty", O_NONBLOCK);
+	if (termfd >= 0) {
+		if (! tcgetattr (termfd, &oldterm)) {
+			newterm = oldterm;
+			newterm.c_lflag &= ~(ECHO | ECHOE | ECHOK);
+			newterm.c_lflag |= ECHONL;
+
+			tcsetattr (termfd, TCSANOW, &newterm);
+		} else {
+			close (termfd);
+			termfd = -1;
+		}
+	}
+
 	printf (_("Enter your registered password: "));
-	answer = fgets_alloc (stdin, TRUE);
+	answer = fgets_alloc (stdin);
+
+	if (termfd >= 0) {
+		if (tcsetattr (termfd, TCSANOW, &oldterm) < 0) {
+			fprintf (stderr, "%s: %s: %s\n", program_name,
+				 _("cannot restore terminal information"),
+				 strerror (errno));
+		}
+
+		close (termfd);
+	}
+
 	if (answer) {
 		free (state->password);
 		state->password = strdup (answer);

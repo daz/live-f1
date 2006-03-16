@@ -1,5 +1,9 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* src/cfgfile.c (fgets_alloc): Restore to pristine libnih function.
+	(get_config): Move termios code here and clean up, I could swear
+	I've done this before; wonder what happened to that.
+
 	* HACKING: Add a file for people who wish to hack on live-f1.
 	* Makefile.am: Ship the HACKING file.
 
