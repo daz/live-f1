@@ -2,7 +2,7 @@
  *
  * http.c - handle web-site authentication and keyframe grabbing
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,10 +40,16 @@
 #define KEY_URL_BASE        "/reg/getkey/"
 #define KEYFRAME_URL_PREFIX "/keyframe"
 
+/* Parts of the certificate we check */
+#define CERT_IDENTITY	    "secure.formula1.com"
+#define CERT_DIGEST         "8b:69:10:49:d4:ee:de:4a:14:3d:5b:76:5b:72:6b:a5:cd:8a:36:16"
+
 
 /* Forward prototypes */
-static void  parse_cookie_hdr (char **value, const char  *header);
-static void  parse_key_body   (unsigned int *key, const char *buf, size_t len);
+static int  check_auth_cert  (void *userdata, int failures,
+			      const ne_ssl_certificate *cert);
+static void parse_cookie_hdr (char **value, const char  *header);
+static void parse_key_body   (unsigned int *key, const char *buf, size_t len);
 
 
 /**
@@ -67,6 +73,7 @@ numlen (unsigned int number)
 /**
  * obtain_auth_cookie:
  * @host: host to obtain cookie from,
+ * @ssl: whether to use https,
  * @email: e-mail address registered with the F1 website,
  * @password: paassword registered for @email.
  *
@@ -80,6 +87,7 @@ numlen (unsigned int number)
  **/
 char *
 obtain_auth_cookie (const char *host,
+		    int         ssl,
 		    const char *email,
 		    const char *password)
 {
@@ -97,7 +105,13 @@ obtain_auth_cookie (const char *host,
 	free (e_password);
 	free (e_email);
 
-	sess = ne_session_create ("http", host, 80);
+	if (ssl) {
+		sess = ne_session_create ("https", host, 443);
+		ne_ssl_set_verify (sess, (ne_ssl_verify_fn) check_auth_cert,
+				   NULL);
+	} else {
+		sess = ne_session_create ("http", host, 80);
+	}
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */
@@ -119,12 +133,42 @@ obtain_auth_cookie (const char *host,
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("login request failed"),
 			 ne_get_status (req)->reason_phrase);
+	} else if (! cookie) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("no authorisation cookie obtained, check credentials"));
+
 	}
 
 	ne_request_destroy (req);
 	ne_session_destroy (sess);
 
 	return cookie;
+}
+
+/**
+ * check_auth_cert:
+ * @userdata: always NULL,
+ * @failures: reasons for verification failure,
+ * @cert: certificate received.
+ *
+ * Check the particulars of the SSL certificate to make sure the identity
+ * and fingerprint match what we expected.
+ **/
+static int check_auth_cert  (void                     *userdata,
+			     int                       failures,
+			     const ne_ssl_certificate *cert)
+{
+	char digest[NE_SSL_DIGESTLEN];
+
+	if (strcmp (ne_ssl_cert_identity (cert), CERT_IDENTITY))
+		return 1;
+
+	if (ne_ssl_cert_digest (cert, digest))
+		return 1;
+	if (strcmp (digest, CERT_DIGEST))
+		return 1;
+
+	return 0;
 }
 
 /**

@@ -1,9 +1,5 @@
 High Priority:
 
- * Looks like the web site is changing logins to https://secure.formula1.com/
-   we'll need to follow suit to be "compatible", though for now the old http
-   location still works.
-
  * Identify a way of noticing when we haven't got the right decryption
    and bailing out -- instead of displaying junk.
 

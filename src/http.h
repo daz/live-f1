@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,8 +25,8 @@
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (const char *host, const char *email,
-				    const char *password);
+char *       obtain_auth_cookie    (const char *host, int ssl,
+				    const char *email, const char *password);
 unsigned int obtain_decryption_key (const char *host, unsigned int event_no,
 				    const char *cookie);
 int          obtain_key_frame      (const char *host, unsigned int frame,

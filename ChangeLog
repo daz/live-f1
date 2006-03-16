@@ -1,3 +1,18 @@
+2006-03-16  Scott James Remnant  <scott@netsplit.com>
+
+	* src/live-f1.h (CurrentState): Add new auth_host member.
+	(DEFAULT_AUTH_HOST): Define the name of the default auth_host.
+	* src/main.c (main): Initialise the auth_host member, if neon
+	supports SSL use it instead of the ordinary host.
+	* src/cfgfile.c (read_config): Parse the auth-host directive.
+	* src/http.c (obtain_auth_cookie): Add new ssl argument and use
+	https and port 443 if TRUE.  Display an error if we failed to
+	obtain a cookie from the server.
+	(check_auth_cert): Check the identity and fingerprint of the SSL
+	certificate; not really secure, but it'll do for now.
+	* src/http.h: Update.
+	* TODO: Update.
+
 2006-03-11  Scott James Remnant  <scott@netsplit.com>
 
 	* src/live-f1.h (EventType): Qualifying has changed to event

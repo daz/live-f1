@@ -100,6 +100,9 @@ read_config (CurrentState *state,
 		} else if (! strcmp (line, "host")) {
 			free (state->host);
 			state->host = strdup (ptr);
+		} else if (! strcmp (line, "auth-host")) {
+			free (state->auth_host);
+			state->auto_host = strdup (ptr);
 		} else {
 			fprintf (stderr, "%s:%s:%d: %s: %s\n", program_name,
 				 filename, lineno, line,

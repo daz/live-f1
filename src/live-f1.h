@@ -26,8 +26,9 @@
 #include "macros.h"
 
 
-/* Default hostname to contact */
-#define DEFAULT_HOST "live-timing.formula1.com"
+/* Default hostnames to contact */
+#define DEFAULT_HOST      "live-timing.formula1.com"
+#define DEFAULT_AUTH_HOST "secure.formula1.com"
 
 /* Make gettext a little friendlier */
 #define _(_str) gettext (_str)
@@ -78,6 +79,7 @@ typedef struct {
 /**
  * CurrentState:
  * @host: hostname to contact,
+ * @auth_host: authorisation host to contact,
  * @email: user's e-mail address,
  * @password: user's password,
  * @cookie: user's authorisation cookie,
@@ -99,7 +101,7 @@ typedef struct {
  * a lot of variables or keep them globally.
  **/
 typedef struct {
-	char          *host;
+	char          *host, *auth_host;
 	char          *email, *password, *cookie;
 	unsigned int   key, salt;
 	unsigned int   frame;

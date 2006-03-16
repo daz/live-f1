@@ -38,6 +38,7 @@
 #include <errno.h>
 
 #include <ne_socket.h>
+#include <ne_utils.h>
 
 #include "live-f1.h"
 #include "cfgfile.h"
@@ -121,6 +122,7 @@ main (int   argc,
 	state = malloc (sizeof (CurrentState));
 	memset (state, 0, sizeof (CurrentState));
 	state->host = NULL;
+	state->auth_host = NULL;
 	state->email = NULL;
 	state->password = NULL;
 	state->cookie = NULL;
@@ -140,12 +142,19 @@ main (int   argc,
 
 	if (! state->host)
 		state->host = DEFAULT_HOST;
+	if (! state->auth_host)
+		state->auth_host = DEFAULT_AUTH_HOST;
 
 	free (config_file);
 
 
-	state->cookie = obtain_auth_cookie (state->host, state->email,
-					    state->password);
+	if (ne_supports_ssl ()) {
+		state->cookie = obtain_auth_cookie (state->auth_host, TRUE,
+						    state->email, state->password);
+	} else {
+		state->cookie = obtain_auth_cookie (state->host, FALSE,
+						    state->email, state->password);
+	}
 	if (! state->cookie)
 		return 2;
 
