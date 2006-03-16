@@ -1,5 +1,8 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* README: Write a new proper README that gives the dependencies and
+	usage information.
+
 	* README: Rename to PROTOCOL.
 	* PROTOCOL: Mention the new secure host and change the examples
 	to match.
