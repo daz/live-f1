@@ -1,5 +1,16 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* configure.ac: Check for ne_has_support() and ne_get_response_header()
+	functions in libneon, these are new with 0.25 and replace functions
+	from 0.24 we were using.  Support both rather than dropping 0.24
+	support.
+	* src/main.c (main): Use ne_has_support() if that function exists,
+	instead of ne_supports_ssl.
+	* src/http.c (obtain_auth_cookie): If neon 0.25 is being used, get
+	the cookie header after the request rather than setting up a handler.
+	(parse_key_body): Change return type to int and return zero to
+	indicate success.
+
 	* src/live-f1.h (CurrentState): Add new auth_host member.
 	(DEFAULT_AUTH_HOST): Define the name of the default auth_host.
 	* src/main.c (main): Initialise the auth_host member, if neon

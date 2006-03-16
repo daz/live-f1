@@ -75,7 +75,7 @@ main (int   argc,
 	CurrentState *state;
 	const char   *home_dir;
 	char         *config_file;
-	int           opt, sock;
+	int           opt, sock, ssl;
 
 	setlocale (LC_ALL, "");
 	bindtextdomain (PACKAGE, LOCALEDIR);
@@ -140,21 +140,22 @@ main (int   argc,
 			return 1;
 	}
 
+#if HAVE_NE_HAS_SUPPORT
+	ssl = ne_has_support (NE_FEATURE_SSL);
+#else
+	ssl = ne_supports_ssl ();
+#endif
+
 	if (! state->host)
 		state->host = DEFAULT_HOST;
 	if (! state->auth_host)
-		state->auth_host = DEFAULT_AUTH_HOST;
+		state->auth_host = ssl ? DEFAULT_AUTH_HOST : DEFAULT_HOST;
 
 	free (config_file);
 
 
-	if (ne_supports_ssl ()) {
-		state->cookie = obtain_auth_cookie (state->auth_host, TRUE,
-						    state->email, state->password);
-	} else {
-		state->cookie = obtain_auth_cookie (state->host, FALSE,
-						    state->email, state->password);
-	}
+	state->cookie = obtain_auth_cookie (state->auth_host, ssl,
+					    state->email, state->password);
 	if (! state->cookie)
 		return 2;
 

@@ -16,6 +16,12 @@ AC_PROG_CC
 
 # Checks for libraries.
 PKG_CHECK_MODULES([NEON], [neon >= 0.24.0])
+AC_CHECK_LIB([neon], [ne_has_support],
+             [AC_DEFINE(HAVE_NE_HAS_SUPPORT, 1,
+                        [Define to 1 if libneon is >= 0.25])])
+AC_CHECK_LIB([neon], [ne_get_response_header],
+             [AC_DEFINE(HAVE_NE_GET_RESPONSE_HEADER, 1,
+                        [Define to 1 if libneon is >= 0.25])])
 
 # Checks for header files.
 AC_HEADER_STDC

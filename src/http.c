@@ -49,7 +49,7 @@
 static int  check_auth_cert  (void *userdata, int failures,
 			      const ne_ssl_certificate *cert);
 static void parse_cookie_hdr (char **value, const char  *header);
-static void parse_key_body   (unsigned int *key, const char *buf, size_t len);
+static int  parse_key_body   (unsigned int *key, const char *buf, size_t len);
 
 
 /**
@@ -94,6 +94,7 @@ obtain_auth_cookie (const char *host,
 	ne_session *sess;
 	ne_request *req;
 	char       *cookie = NULL, *body, *e_email, *e_password;
+	const char *header;
 
 	info (1, _("Obtaining authentication cookie ...\n"));
 
@@ -120,25 +121,40 @@ obtain_auth_cookie (const char *host,
 			       "application/x-www-form-urlencoded");
 	ne_set_request_body_buffer (req, body, strlen (body));
 
+#if ! HAVE_NE_GET_RESPONSE_HEADER
 	/* Set the handler for the cookie header */
 	ne_add_response_header_handler (req, "Set-Cookie",
 					(ne_header_handler) parse_cookie_hdr,
 					&cookie);
+	header = NULL;
+#endif
 
 	/* Dispatch the event, and check it was a good one */
 	if (ne_request_dispatch (req)) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("login request failed"), ne_get_error (sess));
+		goto error;
 	} else if (ne_get_status (req)->code >= 400) {
 		fprintf (stderr, "%s: %s: %s\n", program_name,
 			 _("login request failed"),
 			 ne_get_status (req)->reason_phrase);
-	} else if (! cookie) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("no authorisation cookie obtained, check credentials"));
-
+		goto error;
 	}
 
+#if HAVE_NE_GET_RESPONSE_HEADER
+	header = ne_get_response_header (req, "Set-Cookie");
+	if (header)
+		parse_cookie_hdr (&cookie, header);
+#endif
+
+	if (! cookie) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("login failed: check email and password"));
+
+		goto error;
+	}
+
+error:
 	ne_request_destroy (req);
 	ne_session_destroy (sess);
 
@@ -260,7 +276,7 @@ obtain_decryption_key (const char   *host,
  * Parse data received from the server in response to the key request,
  * filling the decryption key while we can see hexadecimal digits.
  **/
-static void
+static int
 parse_key_body (unsigned int *key,
 		const char   *buf,
 		size_t        len)
@@ -278,6 +294,8 @@ parse_key_body (unsigned int *key,
 			break;
 		}
 	}
+
+	return 0;
 }
 
 /**
