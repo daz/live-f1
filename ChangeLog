@@ -1,5 +1,8 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* HACKING: Add a file for people who wish to hack on live-f1.
+	* Makefile.am: Ship the HACKING file.
+
 	* README: Write a new proper README that gives the dependencies and
 	usage information.
 
