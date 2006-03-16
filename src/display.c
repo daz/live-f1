@@ -630,7 +630,7 @@ _update_time (CurrentState *state)
 	wmove (statwin, nlines - 1, 0);
 	wattrset (statwin, attrs[COLOUR_DATA]);
 
-	if (state->epoch_time) {
+	if (state->epoch_time && (state->flag != RED_FLAG)) {
 		remaining = MAX ((state->epoch_time + state->remaining_time)
 				 - time (NULL), 0);
 	} else {

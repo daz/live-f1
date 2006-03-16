@@ -1,5 +1,8 @@
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (_update_time): Halt the remaining time countdown
+	while under a red flag.
+
 	* src/cfgfile.c (fgets_alloc): Restore to pristine libnih function.
 	(get_config): Move termios code here and clean up, I could swear
 	I've done this before; wonder what happened to that.
