@@ -202,7 +202,7 @@ clear_board (CurrentState *state)
 		mvwprintw (boardwin, 0, 0,
 			   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
 			   _("P"), _(""), _("Name"), _("Period 1"),
-			   _("Pediod 2"), _("Period 3"), _("Sec 1"),
+			   _("Period 2"), _("Period 3"), _("Sec 1"),
 			   _("Sec 2"), _("Sec 3"), _("Ls"));
 		break;
 	}

@@ -1,5 +1,7 @@
 2006-05-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (clear_board): Correct typo (Pediod -> Period).
+
 	* README: Document the HACKING file, despite being standard for
 	a while now; some people are still relying on Debian's backward
 	auto* installation (including Ubuntu ... must fix that in edgy).
