@@ -1,3 +1,9 @@
+2006-05-14  Scott James Remnant  <scott@netsplit.com>
+
+	* README: Document the HACKING file, despite being standard for
+	a while now; some people are still relying on Debian's backward
+	auto* installation (including Ubuntu ... must fix that in edgy).
+
 2006-03-16  Scott James Remnant  <scott@netsplit.com>
 
 	* configure.ac: Bump version to 0.2.5.

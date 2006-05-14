@@ -25,7 +25,8 @@ installed, the Ubuntu/Debian package names are given below.
 	* libneon 0.24 or later (libneon25-dev or libneon24-dev)
 
 For detailed compilation and installation instructions see the INSTALL
-file.
+file, if you've checked live-f1 out from revision control or want to
+hack on live-f1, see the HACKING file.
 
 
 Usage
