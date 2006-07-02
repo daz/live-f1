@@ -1,3 +1,10 @@
+0.2.6  2006-07-02  "Need for Speed"
+
+	* Fixed Bug #44664; cause of occasional startup failure with the
+        "key frame request failed: 200 OK" message.
+
+	* Document the HACKING and ship the PROTOCOL files.
+
 0.2.5  2006-03-16  "Lift me up"
 
 	* Fixed Bug #34327: now compiles with libneon25.
