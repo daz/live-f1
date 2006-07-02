@@ -5,6 +5,8 @@
 	block callback.
 	* src/stream.h: Update prototype.
 
+	* Makefile.am (EXTRA_DIST): Ship PROTOCOL file.
+
 2006-05-14  Scott James Remnant  <scott@netsplit.com>
 
 	* src/display.c (clear_board): Correct typo (Pediod -> Period).
