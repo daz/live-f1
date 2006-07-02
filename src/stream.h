@@ -27,7 +27,7 @@ SJR_BEGIN_EXTERN
 
 int  open_stream        (const char *hostname, unsigned int port);
 int  read_stream        (CurrentState *state, int sock);
-void parse_stream_block (CurrentState *state, const unsigned char *buf,
+int  parse_stream_block (CurrentState *state, const unsigned char *buf,
 			 size_t buf_len);
 
 void reset_decryption   (CurrentState *state);

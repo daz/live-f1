@@ -214,7 +214,7 @@ read_stream (CurrentState *state, int sock)
  * key frame.  Calls either handle_car_packet() or handle_system_packet(),
  * and is safe for those to result in further stream parsing calls.
  **/
-void
+int
 parse_stream_block (CurrentState        *state,
 		    const unsigned char *buf,
 		    size_t               buf_len)
@@ -228,6 +228,8 @@ parse_stream_block (CurrentState        *state,
 			handle_system_packet (state, &packet);
 		}
 	}
+
+	return 0;
 }
 
 /**
