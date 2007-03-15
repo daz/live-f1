@@ -1,3 +1,8 @@
+2007-03-15  Scott James Remnant  <scott@netsplit.com>
+
+	* src/http.c (CERT_DIGEST): The digest of the certificate appears
+	to have changed; update to the new login cert.
+
 2006-07-02  Scott James Remnant  <scott@netsplit.com>
 
 	* configure.ac: Bump version to 0.2.6.

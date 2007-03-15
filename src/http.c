@@ -42,7 +42,7 @@
 
 /* Parts of the certificate we check */
 #define CERT_IDENTITY	    "secure.formula1.com"
-#define CERT_DIGEST         "8b:69:10:49:d4:ee:de:4a:14:3d:5b:76:5b:72:6b:a5:cd:8a:36:16"
+#define CERT_DIGEST         "89:e7:70:73:49:84:f6:c6:08:03:6c:28:57:c0:ec:cc:4a:b3:68:f9"
 
 
 /* Forward prototypes */
