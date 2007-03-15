@@ -1,3 +1,7 @@
+0.2.7  2007-03-15  "Super Aguri"
+
+	* Update digest of secure web server SSL certificate.
+
 0.2.6  2006-07-02  "Need for Speed"
 
 	* Fixed Bug #44664; cause of occasional startup failure with the
