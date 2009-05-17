@@ -234,7 +234,7 @@ info (int         irrelevance,
 			char msg[512];
 
 			ret = vsnprintf (msg, sizeof (msg), format, ap);
-			msg[sizeof (msg)] = 0;
+			msg[sizeof (msg) - 1] = 0;
 
 			popup_message (msg);
 		} else {

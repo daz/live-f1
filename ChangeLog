@@ -1,5 +1,8 @@
 2009-05-17  Scott James Remnant  <scott@netsplit.com>
 
+	* src/main.c (info): Don't write past the end of the buffer,
+	instead write to the last element.
+
 	* README: Update URL to Live Timing registration on formula1.com
 
 2007-03-15  Scott James Remnant  <scott@netsplit.com>

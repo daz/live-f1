@@ -2,6 +2,8 @@
 
        * Fixed Bug #374433: Updated URL to Live Timing registration.
 
+       * Fixed Bug #374457: Write past end of array
+
 0.2.7  2007-03-15  "Super Aguri"
 
 	* Update digest of secure web server SSL certificate.
