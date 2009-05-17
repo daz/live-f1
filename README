@@ -36,7 +36,7 @@ The first time you run live-f1 it will ask you for the e-mail address
 and password you registered at the Formula-1 website.  If you've not
 already done so, you'll need to register by filling in the form at:
 
-	http://www.formula1.com/livetiming_registration/
+	http://www.formula1.com/services/live_timing/registration.html
 
 Your registration details are stored in the .f1rc file in your home
 directory, should you need to change them later.

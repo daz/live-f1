@@ -1,3 +1,7 @@
+0.2.8  2009-05-17  "The Chain"
+
+       * Fixed Bug #374433: Updated URL to Live Timing registration.
+
 0.2.7  2007-03-15  "Super Aguri"
 
 	* Update digest of secure web server SSL certificate.
