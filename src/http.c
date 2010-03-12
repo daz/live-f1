@@ -2,7 +2,7 @@
  *
  * http.c - handle web-site authentication and keyframe grabbing
  *
- * Copyright © 2007 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2010 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,8 +35,8 @@
 
 
 /* URLs to important places on the live-timing site */
-#define LOGIN_URL           "/reg/login.asp"
-#define REGISTER_URL        "/reg/register.asp"
+#define LOGIN_URL           "/reg/login"
+#define REGISTER_URL        "/reg/registration"
 #define KEY_URL_BASE        "/reg/getkey/"
 #define KEYFRAME_URL_PREFIX "/keyframe"
 
