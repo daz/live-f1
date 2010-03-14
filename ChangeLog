@@ -1,3 +1,7 @@
+2010-03-14  Scott James Remnant  <scott@netsplit.com>
+
+	* README: Update registration URL
+
 2010-03-13  Scott James Remnant  <scott@netsplit.com>
 
 	* configure.ac: Bump version to 0.2.9.
