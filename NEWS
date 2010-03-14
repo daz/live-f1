@@ -1,8 +1,11 @@
 0.2.9  xxxx-xx-xx
 
-       * Fixed Bug #537214: Updated URL to Login Server.
+	* Fixed Bug #537214: Updated URL to Login Server.
 
-       * Fixed Bug #537422: Updated URL to Live Timing registration.
+	* Fixed Bug #537422: Updated URL to Live Timing registration.
+
+	* Fixed Bug #538695: Rearranged columns on the race timing screen
+	to match the new timing format.
 
 0.2.8  2009-05-17  "The Chain"
 

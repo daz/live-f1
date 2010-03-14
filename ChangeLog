@@ -1,5 +1,12 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h (RaceAtomType): With the changes to pit stops this
+	year, they've dropped the columns between the sector times for
+	each of the pit stop times.  Instead it seems that the pit stop
+	time appears in the new Sector 3 column (old Sector 2 column).
+	* src/display.c (_update_cell): Increase the amount of space
+	available for sector times, just in case they increase it.
+
 	* NEWS: Update.
 
 	* README: Update registration URL

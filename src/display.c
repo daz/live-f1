@@ -2,7 +2,7 @@
  *
  * display.c - displaying of timing and messages
  *
- * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2010 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -284,33 +284,18 @@ _update_cell (CurrentState *state,
 			break;
 		case RACE_SECTOR_1:
 			x = 40;
-			sz = 4;
+			sz = 5;
 			align = 1;
-			break;
-		case RACE_PIT_LAP_1:
-			x = 45;
-			sz = 3;
-			align = -1;
 			break;
 		case RACE_SECTOR_2:
 			x = 49;
-			sz = 4;
+			sz = 5;
 			align = 1;
-			break;
-		case RACE_PIT_LAP_2:
-			x = 54;
-			sz = 3;
-			align = -1;
 			break;
 		case RACE_SECTOR_3:
 			x = 58;
-			sz = 4;
+			sz = 5;
 			align = 1;
-			break;
-		case RACE_PIT_LAP_3:
-			x = 63;
-			sz = 3;
-			align = -1;
 			break;
 		case RACE_NUM_PITS:
 			x = 67;

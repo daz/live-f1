@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2010 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -47,11 +47,8 @@ typedef enum {
 	RACE_INTERVAL,
 	RACE_LAP_TIME,
 	RACE_SECTOR_1,
-	RACE_PIT_LAP_1,
 	RACE_SECTOR_2,
-	RACE_PIT_LAP_2,
 	RACE_SECTOR_3,
-	RACE_PIT_LAP_3,
 	RACE_NUM_PITS,
 	LAST_RACE_ATOM
 } RaceAtomType;
@@ -71,7 +68,6 @@ typedef enum {
 	PRACTICE_SECTOR_2,
 	PRACTICE_SECTOR_3,
 	PRACTICE_LAPS,
-	PRACTICE_UNKNOWN,
 	LAST_PRACTICE
 } PracticeAtomType;
 
