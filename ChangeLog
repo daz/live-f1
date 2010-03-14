@@ -1,5 +1,8 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/http.c (obtain_auth_cookie): Don't destroy the session to the
+	SSL server, this causes a hang of a few minutes on my laptop :-(
+
 	* src/packet.c (handle_car_packet): The lap number in the top-right
 	was one out, because the lap in the timing feed is the lap the
 	leading car just completed rather than the lap it is currently on.

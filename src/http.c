@@ -156,7 +156,10 @@ obtain_auth_cookie (const char *host,
 
 error:
 	ne_request_destroy (req);
-	ne_session_destroy (sess);
+	/* My machine hangs for ages when I do this, so I know this is a
+	 * leak; but I need to debug.
+	 */
+	//ne_session_destroy (sess);
 
 	return cookie;
 }
