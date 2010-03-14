@@ -66,6 +66,9 @@ int cursed = 0;
 /* Number of lines being used for the board */
 static int nlines = 0;
 
+/* Did we have room for the header? */
+static int header = 0;
+
 /* Attributes for the colours */
 static int attrs[LAST_COLOUR];
 
@@ -166,7 +169,12 @@ clear_board (CurrentState *state)
 	nlines = MAX (state->num_cars, 22);
 	for (i = 0; i < state->num_cars; i++)
 		nlines = MAX (nlines, state->car_position[i]);
-	nlines += 1;
+	if (nlines + 1 <= LINES) {
+		header = 1;
+		nlines += 1;
+	} else {
+		header = 0;
+	}
 	if (LINES < nlines) {
 		close_display ();
 		fprintf (stderr, "%s: %s\n", program_name,
@@ -184,27 +192,29 @@ clear_board (CurrentState *state)
 	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
 	werase (boardwin);
 
-	switch (state->event_type) {
-	case RACE_EVENT:
-		mvwprintw (boardwin, 0, 0,
-			   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
-			   _("P"), _(""), _("Name"), _("Gap"), _("Int"),
-			   _("Time"), _("Sector 1"), _("Sector 2"),
-			   _("Sector 3"), _("Ps"));
-		break;
-	case PRACTICE_EVENT:
-		mvwprintw (boardwin, 0, 0,
-			   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
-			   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
-			   _("Sec 1"), _("Sec 2"), _("Sec 3"), _("Laps"));
-		break;
-	case QUALIFYING_EVENT:
-		mvwprintw (boardwin, 0, 0,
-			   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
-			   _("P"), _(""), _("Name"), _("Period 1"),
-			   _("Period 2"), _("Period 3"), _("Sec 1"),
-			   _("Sec 2"), _("Sec 3"), _("Ls"));
-		break;
+	if (header) {
+		switch (state->event_type) {
+		case RACE_EVENT:
+			mvwprintw (boardwin, 0, 0,
+				   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
+				   _("P"), _(""), _("Name"), _("Gap"), _("Int"),
+				   _("Time"), _("Sector 1"), _("Sector 2"),
+				   _("Sector 3"), _("Ps"));
+			break;
+		case PRACTICE_EVENT:
+			mvwprintw (boardwin, 0, 0,
+				   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
+				   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
+				   _("Sec 1"), _("Sec 2"), _("Sec 3"), _("Laps"));
+			break;
+		case QUALIFYING_EVENT:
+			mvwprintw (boardwin, 0, 0,
+				   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
+				   _("P"), _(""), _("Name"), _("Period 1"),
+				   _("Period 2"), _("Period 3"), _("Sec 1"),
+				   _("Sec 2"), _("Sec 3"), _("Ls"));
+			break;
+		}
 	}
 
 	for (i = 1; i <= state->num_cars; i++) {
@@ -246,6 +256,8 @@ _update_cell (CurrentState *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
+	if (! header)
+		y--;
 	if (nlines < y)
 		clear_board (state);
 
@@ -513,6 +525,8 @@ clear_car (CurrentState *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
+	if (! header)
+		y--;
 	if (nlines < y)
 		clear_board (state);
 

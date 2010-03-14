@@ -11,6 +11,9 @@
 	"just completed" lap - we want the lap in the top right to be the
 	*current* lap.
 
+	* Hide the header when displaying on a 24-line terminal, so we can
+	display all 24 cars.
+
 0.2.8  2009-05-17  "The Chain"
 
        * Fixed Bug #374433: Updated URL to Live Timing registration.

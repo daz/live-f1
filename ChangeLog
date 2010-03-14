@@ -1,5 +1,9 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/display.c (clear_board, _update_cell, clear_car): Since we
+	have 24 cars now, and the usual xterm height is 24 characters, hide
+	the header so we have room.
+
 	* src/http.c (obtain_auth_cookie): Don't destroy the session to the
 	SSL server, this causes a hang of a few minutes on my laptop :-(
 
