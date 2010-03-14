@@ -1,5 +1,7 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* NEWS: Release 0.2.9
+
 	* src/display.c (clear_board, _update_cell, clear_car): Since we
 	have 24 cars now, and the usual xterm height is 24 characters, hide
 	the header so we have room.
