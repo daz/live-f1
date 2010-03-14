@@ -1,5 +1,8 @@
 2009-05-17  Scott James Remnant  <scott@netsplit.com>
 
+	* configure.ac: Bump version to 0.2.8.  Update copyright year.
+	* src/main.c (print_version): Update copyright year
+
 	* src/main.c (info): Don't write past the end of the buffer,
 	instead write to the last element.
 
