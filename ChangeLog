@@ -1,5 +1,9 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.h: Update the enums so they all have numbers, now I
+	can record a timing stream in decoded format (with 0.3.0, coming soon!)
+	it helps figure out the rest of the packets.
+
 	* src/packet.h (RaceAtomType): With the changes to pit stops this
 	year, they've dropped the columns between the sector times for
 	each of the pit stop times.  Instead it seems that the pit stop
