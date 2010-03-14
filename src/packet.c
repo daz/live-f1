@@ -2,7 +2,7 @@
  *
  * packet.c - individual packet handling
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2009 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -132,7 +132,7 @@ handle_car_packet (CurrentState *state,
 				number += packet->payload[i] - '0';
 			}
 
-			state->lap = number;
+			state->lap = number + 1;
 			update_status (state);
 		}
 		break;

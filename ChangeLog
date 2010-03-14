@@ -1,5 +1,11 @@
 2010-03-14  Scott James Remnant  <scott@netsplit.com>
 
+	* src/packet.c (handle_car_packet): The lap number in the top-right
+	was one out, because the lap in the timing feed is the lap the
+	leading car just completed rather than the lap it is currently on.
+	I don't know whether this is a change for this year, or whether it's
+	always been wrong and I've just never noticed.
+
 	* src/packet.h: Update the enums so they all have numbers, now I
 	can record a timing stream in decoded format (with 0.3.0, coming soon!)
 	it helps figure out the rest of the packets.

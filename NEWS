@@ -7,6 +7,10 @@
 	* Fixed Bug #538695: Rearranged columns on the race timing screen
 	to match the new timing format.
 
+	* Add one to the lap number, the lap in the timing columns is the
+	"just completed" lap - we want the lap in the top right to be the
+	*current* lap.
+
 0.2.8  2009-05-17  "The Chain"
 
        * Fixed Bug #374433: Updated URL to Live Timing registration.
