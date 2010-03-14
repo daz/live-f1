@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2009 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2010 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -259,7 +259,7 @@ static void
 print_version (void)
 {
 	printf ("%s\n", PACKAGE_STRING);
-	printf ("Copyright (C) 2009 Scott James Remnant <scott@netsplit.com>.\n");
+	printf ("Copyright (C) 2010 Scott James Remnant <scott@netsplit.com>.\n");
 	printf ("\n");
 	printf (_("This is free software, covered by the GNU General Public License; see the\n"
 		  "source for copying conditions.  There is NO warranty; not even for\n"
