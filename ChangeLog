@@ -1,3 +1,7 @@
+2010-03-11  Scott James Remnant  <scott@netsplit.com>
+
+	* src/http.c (LOGIN_URL, REGISTER_URL): Update URLs
+
 2009-05-17  Scott James Remnant  <scott@netsplit.com>
 
 	* configure.ac: Bump version to 0.2.8.  Update copyright year.
