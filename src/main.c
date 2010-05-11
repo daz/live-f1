@@ -140,11 +140,7 @@ main (int   argc,
 			return 1;
 	}
 
-#if HAVE_NE_HAS_SUPPORT
-	ssl = ne_has_support (NE_FEATURE_SSL);
-#else
-	ssl = ne_supports_ssl ();
-#endif
+	ssl = 0;
 
 	if (! state->host)
 		state->host = DEFAULT_HOST;

@@ -205,14 +205,14 @@ clear_board (CurrentState *state)
 			mvwprintw (boardwin, 0, 0,
 				   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
 				   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
-				   _("Sec 1"), _("Sec 2"), _("Sec 3"), _("Laps"));
+				   _("Sec 1"), _("Sec 2"), _("Sec 3"), _(" Lap"));
 			break;
 		case QUALIFYING_EVENT:
 			mvwprintw (boardwin, 0, 0,
 				   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
 				   _("P"), _(""), _("Name"), _("Period 1"),
 				   _("Period 2"), _("Period 3"), _("Sec 1"),
-				   _("Sec 2"), _("Sec 3"), _("Ls"));
+				   _("Sec 2"), _("Sec 3"), _("Lp"));
 			break;
 		}
 	}
@@ -296,18 +296,33 @@ _update_cell (CurrentState *state,
 			break;
 		case RACE_SECTOR_1:
 			x = 40;
-			sz = 5;
+			sz = 4;
 			align = 1;
+			break;
+		case RACE_PIT_LAP_1:
+			x = 45;
+			sz = 3;
+			align = -1;
 			break;
 		case RACE_SECTOR_2:
 			x = 49;
-			sz = 5;
+			sz = 4;
 			align = 1;
+			break;
+		case RACE_PIT_LAP_2:
+			x = 54;
+			sz = 3;
+			align = -1;
 			break;
 		case RACE_SECTOR_3:
 			x = 58;
-			sz = 5;
+			sz = 4;
 			align = 1;
+			break;
+		case RACE_PIT_LAP_3:
+			x = 63;
+			sz = 3;
+			align = -1;
 			break;
 		case RACE_NUM_PITS:
 			x = 67;
@@ -360,7 +375,7 @@ _update_cell (CurrentState *state,
 			sz = 5;
 			align = 1;
 			break;
-		case PRACTICE_LAPS:
+		case PRACTICE_LAP:
 			x = 55;
 			sz = 4;
 			align = 1;
@@ -416,7 +431,7 @@ _update_cell (CurrentState *state,
 			sz = 5;
 			align = 1;
 			break;
-		case QUALIFYING_LAPS:
+		case QUALIFYING_LAP:
 			x = 66;
 			sz = 2;
 			align = 1;
@@ -629,9 +644,12 @@ _update_time (CurrentState *state)
 	wmove (statwin, nlines - 1, 0);
 	wattrset (statwin, attrs[COLOUR_DATA]);
 
-	if (state->epoch_time && (state->flag != RED_FLAG)) {
-		remaining = MAX ((state->epoch_time + state->remaining_time)
-				 - time (NULL), 0);
+	// Pause the clock during a red flag, but only for Qualifying and the Race.
+	if ((state->flag == RED_FLAG) && (state->event_type != PRACTICE_EVENT))
+	{
+		remaining = state->remaining_time;
+	} else if (state->epoch_time) {
+		remaining = MAX ((state->epoch_time + state->remaining_time) - time (NULL), 0);
 	} else {
 		remaining = state->remaining_time;
 	}
@@ -643,11 +661,11 @@ _update_time (CurrentState *state)
 		remaining %= 60;
 		wprintw (statwin, "%02d", remaining);
 	} else if (remaining >= 60) {
-		wprintw (statwin, "  %2d:", remaining / 60);
+		wprintw (statwin, "0:%02d:", remaining / 60);
 		remaining %= 60;
 		wprintw (statwin, "%02d", remaining);
 	} else {
-		wprintw (statwin, "     %2d", remaining);
+		wprintw (statwin, "0:00:%02d", remaining);
 	}
 
 	wnoutrefresh (statwin);

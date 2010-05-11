@@ -246,7 +246,7 @@ get_config (CurrentState *state)
 
 	printf (_("In order to connect to the Live Timing stream, you need to be registered;\n"
 		  "if you've not yet done so, do so now by filling in the form at the URL:\n"));
-	printf ("http://www.formula1.com/livetiming_registration/\n");
+	printf ("http://www.formula1.com/reg/registration\n");
 	printf ("\n");
 	printf (_("Enter your registered e-mail address: "));
 	answer = fgets_alloc (stdin);

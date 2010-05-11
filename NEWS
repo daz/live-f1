@@ -1,3 +1,22 @@
+0.2.10 2010-05-11
+
+	* New Maintainer: Dave Pusey <dave@puseyuk.co.uk>
+
+	* Fixed Bug #537422: Updated URL to Live Timing registration in src/cfgfile.c
+
+	* Fixed Bug #548545: Clock is no longer paused during Practice red flag.
+
+	* Fixed Bug #555172: Undid revision 91, restoring Sector 2, Sector 3, and Pit Stops columns.
+
+	* Fixed Bug #560120: Linker error when compiling on MacOS X.
+
+	* Added leading zeros to clock display.
+
+	* Corrected Practice and Qualifying "Laps" column to "Lap", as it displays
+	the lap number the car is currently on, not the number of laps completed.
+	This can be seen when a car leaves the pit lane on its installation lap, as
+	the column immediately changes to 1, indicating the first lap for that car.
+
 0.2.9  2010-03-14  "Don't Stop Believin'"
 
 	* Fixed Bug #537214: Updated URL to Login Server.

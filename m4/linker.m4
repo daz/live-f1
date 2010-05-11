@@ -32,8 +32,8 @@ AC_DEFUN([SJR_LINKER_OPTIMISATIONS],
 [if test "x$enable_linker_optimisations" = "xno"; then
 	[LDFLAGS=`echo "$LDFLAGS" | sed -e "s/ -Wl,-O[0-9]*\b//g"`]
 else
-	[LDFLAGS="$LDFLAGS -Wl,-O1"]
-fi], [LDFLAGS="$LDFLAGS -Wl,-O1"])dnl
+	[LDFLAGS="$LDFLAGS"]
+fi], [LDFLAGS="$LDFLAGS"])dnl
 ])# SJR_LINKER_OPTIMISATIONS
 
 # SJR_LINKER_VERSION_SCRIPT
