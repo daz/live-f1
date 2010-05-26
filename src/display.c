@@ -136,9 +136,9 @@ open_display (void)
 		attrs[COLOUR_OLD]         = COLOR_PAIR (COLOUR_OLD);
 		attrs[COLOUR_ELIMINATED]  = COLOR_PAIR (COLOUR_ELIMINATED) | A_BOLD;
 		attrs[COLOUR_POPUP]       = COLOR_PAIR (COLOUR_POPUP) | A_BOLD;
-		attrs[COLOUR_GREEN_FLAG]  = COLOR_PAIR (COLOUR_GREEN_FLAG);
-		attrs[COLOUR_YELLOW_FLAG] = COLOR_PAIR (COLOUR_YELLOW_FLAG);
-		attrs[COLOUR_RED_FLAG]    = COLOR_PAIR (COLOUR_RED_FLAG);
+		attrs[COLOUR_GREEN_FLAG]  = COLOR_PAIR (COLOUR_GREEN_FLAG) | A_REVERSE;
+		attrs[COLOUR_YELLOW_FLAG] = COLOR_PAIR (COLOUR_YELLOW_FLAG) | A_REVERSE;
+		attrs[COLOUR_RED_FLAG]    = COLOR_PAIR (COLOUR_RED_FLAG) | A_REVERSE;
 	}
 
 	bkgdset (attrs[COLOUR_DEFAULT]);
@@ -556,6 +556,25 @@ clear_car (CurrentState *state,
 }
 
 /**
+ * draw_bar:
+ * @win: the window into which to draw
+ * @len: the length of the bar to draw
+ *
+ * Draws a solid bar of a specified length, at the current cursor
+ * position in the specified window.
+ **/
+void
+draw_bar (WINDOW *win, int len)
+{
+	int i;
+
+	for (i = 0; i < len; i++)
+	{
+		waddch (win, ' ');
+	}
+}
+
+/**
  * update_status:
  * @state: application state structure,
  *
@@ -580,38 +599,36 @@ update_status (CurrentState *state)
 	}
 
 	/* Output the race status */
-	wmove (statwin, 1, 0);
+	wmove (statwin, 2, 0);
 	wclrtoeol (statwin);
 	switch (state->flag) {
-	case GREEN_FLAG:
-		wattrset (statwin, attrs[COLOUR_GREEN_FLAG]);
-		break;
 	case YELLOW_FLAG:
-		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		break;
 	case SAFETY_CAR_STANDBY:
-		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		waddstr (statwin, "SC Standby");
-		break;
 	case SAFETY_CAR_DEPLOYED:
 		wattrset (statwin, attrs[COLOUR_YELLOW_FLAG]);
-		waddstr (statwin, "Safety Car");
+		draw_bar (statwin, 10);
 		break;
 	case RED_FLAG:
 		wattrset (statwin, attrs[COLOUR_RED_FLAG]);
-		waddstr (statwin, "Stopped");
+		draw_bar (statwin, 10);
 		break;
-	default:
-		wattrset (statwin, attrs[COLOUR_DEFAULT]);
+	}
+	wmove (statwin, 3, 0);
+	wclrtoeol (statwin);
+	switch (state->flag) {
+	case SAFETY_CAR_DEPLOYED:
+		wattrset (statwin, attrs[COLOUR_OLD]);
+		waddstr (statwin, "SAFETY CAR");
 		break;
 	}
 
-	/* Number of laps, or event type (use same colour as flag) */
+	/* Number of laps, or event type */
+	wattrset (statwin, attrs[COLOUR_DATA]);
 	wmove (statwin, 0, 0);
 	wclrtoeol (statwin);
 	switch (state->event_type) {
 	case RACE_EVENT:
-		wprintw (statwin, "Lap %3d", state->lap);
+		wprintw (statwin, "Lap %2d", state->lap);
 		break;
 	case PRACTICE_EVENT:
 		wprintw (statwin, "Practice");

@@ -2,6 +2,8 @@
 
 	* Fixed Bug #580064: libintl error when compiling on MacOS X.
 
+	* More prominent display of track status.
+
 2010-05-11  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* NEWS: Release 0.2.10
