@@ -6,6 +6,8 @@
 
 	* Fixed Bug #581680: Added a man page for live-f1.
 
+	* Fixed Bug #355797: Handle system packet type 5.
+
 2010-05-11  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* NEWS: Release 0.2.10

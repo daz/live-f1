@@ -335,6 +335,11 @@ next_packet (CurrentState         *state,
 			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 0;
 			break;
+		case SYS_END_OF_STREAM:
+			packet->len = 0;
+			packet->data = 0;
+			decrypt = 0;
+			break;
 		default:
 			info (3, _("Unknown system packet type: %d\n"),
 			      packet->type);
