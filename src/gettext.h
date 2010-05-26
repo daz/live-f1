@@ -19,14 +19,6 @@
 #ifndef _LIBGETTEXT_H
 #define _LIBGETTEXT_H 1
 
-/* NLS can be disabled through the configure --disable-nls option.  */
-#if ENABLE_NLS
-
-/* Get declarations of GNU message catalog functions.  */
-# include <libintl.h>
-
-#else
-
 /* Solaris /usr/include/locale.h includes /usr/include/libintl.h, which
    chokes if dcgettext is defined as a macro.  So include it now, to make
    later inclusions of <locale.h> a NOP.  We don't include <libintl.h>
@@ -64,8 +56,6 @@
 # define textdomain(Domainname) ((const char *) (Domainname))
 # define bindtextdomain(Domainname, Dirname) ((const char *) (Dirname))
 # define bind_textdomain_codeset(Domainname, Codeset) ((const char *) (Codeset))
-
-#endif
 
 /* A pseudo function call that serves as a marker for the automated
    extraction of messages, but does not call gettext().  The run-time

@@ -1,3 +1,7 @@
+2010-05-26  Dave Pusey  <dave@puseyuk.co.uk>
+
+	* Fixed Bug #580064: libintl error when compiling on MacOS X.
+
 2010-05-11  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* NEWS: Release 0.2.10
