@@ -40,6 +40,6 @@ SJR_COMPILER_OPTIMISATIONS
 SJR_COMPILER_COVERAGE
 SJR_LINKER_OPTIMISATIONS
 
-AC_CONFIG_FILES([ Makefile po/Makefile.in intl/Makefile src/Makefile ])
+AC_CONFIG_FILES([ Makefile po/Makefile.in intl/Makefile man/Makefile src/Makefile ])
 AC_CONFIG_HEADERS([config.h])
 AC_OUTPUT

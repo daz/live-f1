@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-SUBDIRS = po intl src
+SUBDIRS = po intl man src
 
 EXTRA_DIST = HACKING PROTOCOL
 

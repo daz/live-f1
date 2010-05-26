@@ -1,0 +1,111 @@
+.TH LIVE-F1 1 2010-05-26 "Dave Pusey" "Live F1 0.2.10"
+.SH NAME
+live-f1 - Formula 1 Live Timing client.
+.SH SYNOPSIS
+live-f1 [options]
+.SH DESCRIPTION
+The official Formula 1 website includes a Java client, which during races, qualifying, and practice sessions, displays the Live Timing information from the race track.
+
+This native Linux client displays information from the same Live Timing feed, without the need for a Java-enabled web browser.
+.SH OPTIONS
+-v, --verbose
+.br
+			Increases verbosity level. Can be used multiple times.
+
+--help
+.br
+			Displays usage information and then exits.
+
+--version
+.br
+			Displays version information and then exits.
+.SH HOMEPAGE
+https://launchpad.net/live-f1
+.SH REPORT BUGS
+https://bugs.launchpad.net/live-f1
+.SH CONFIGURATION
+To access the Live Timing feed, you will need to register for a user account at:
+
+http://www.formula1.com/reg/registration
+
+When run for the first time, you will be prompted for your formula1.com username and password. Once entered, this information is stored in ~/.f1rc for future sessions.
+.SH DISPLAY COLOURS
+YELLOW		Default colour.
+
+WHITE		Latest information.
+
+RED			Car is in the pit lane.
+
+GREEN		Personal best.
+
+PURPLE		Overall best.
+
+GREY			Driver has been knocked out of qualifying.
+.SH PRACTICE COLUMNS
+P			Current position.
+
+NAME			Driver's name.
+
+BEST			Personal best lap time.
+
+GAP			Difference between best lap time and P1 best lap time.
+
+SEC 1		Sector 1 time for the current lap.
+
+SEC 2		Sector 2 time for the current lap.
+
+SEC 3		Sector 3 time for the current lap.
+
+LAP			Lap number for the current lap.
+.SH QUALIFYING COLUMNS
+P			Current position.
+
+NAME			Driver's name.
+
+PERIOD 1		Personal best lap time during the first session.
+
+PERIOD 2		Personal best lap time during the second session.
+
+PERIOD 3		Personal best lap time during the third session.
+
+SEC 1		Sector 1 time for the current lap.
+
+SEC 2		Sector 2 time for the current lap.
+
+SEC 3		Sector 3 time for the current lap.
+
+LP			Lap number for the current lap.
+.SH RACE COLUMNS
+P			Current position.
+
+NAME			Driver's name.
+
+GAP			Distance from the leader, in seconds.
+
+INT			Distance from the car ahead, in seconds. Yellow
+.br
+			indicates the distance has increased since the previous
+.br
+			lap. White indicates the distance has decreased since
+.br
+			the previous lap.
+
+TIME			Lap time for the last completed lap.
+
+SECTOR 1		Sector 1 time for the current lap.
+
+SECTOR 2		Sector 2 time for the current lap.
+
+SECTOR 3		Sector 3 time for the current lap.
+
+PS			Number of times the car has entered the pit lane.
+.SH TRACK STATUS
+The current track status is shown in the top-right of the display.
+
+Yellow Flags	A yellow bar will be displayed.
+
+Safety Car	A yellow bar and the words SAFETY CAR will be displayed.
+
+Red Flag		A red bar will be displayed.
+.SH SESSION CLOCK
+The remaining time for the current session is shown in the bottom-right of the display.

@@ -4,6 +4,8 @@
 
 	* More prominent display of track status.
 
+	* Fixed Bug #581680: Added a man page for live-f1.
+
 2010-05-11  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* NEWS: Release 0.2.10
