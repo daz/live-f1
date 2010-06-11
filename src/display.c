@@ -28,6 +28,7 @@
 #include <string.h>
 #include <curses.h>
 #include <time.h>
+#include <regex.h>
 
 #include "live-f1.h"
 #include "packet.h" /* for packet type */
@@ -774,11 +775,21 @@ popup_message (const char *message)
 	char  *msg;
 	size_t msglen;
 	int    nlines, ncols, col, ls, i;
+	regex_t re;
 
 	open_display ();
 	close_popup ();
 
-	msg = strdup (message);
+	regcomp(&re, "^img:", REG_EXTENDED|REG_NOSUB);
+
+	if (regexec(&re, message, (size_t)0, NULL, 0) == 0)
+	{
+		msg = strdup ("CURRENTLY NO LIVE SESSION");
+	} else {
+		msg = strdup (message);
+	}
+	regfree (&re);
+
 	msglen = strlen (msg);
 	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
 		msg[--msglen] = 0;
