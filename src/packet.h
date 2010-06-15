@@ -103,8 +103,9 @@ typedef enum {
 typedef enum {
 	SYS_EVENT_ID		= 1,
 	SYS_KEY_FRAME		= 2,
+	SYS_VALID_MARKER	= 3,
 	SYS_COMMENTARY		= 4,
-	SYS_END_OF_STREAM	= 5,
+	SYS_REFRESH_RATE	= 5,
 	SYS_NOTICE		= 6,
 	SYS_TIMESTAMP		= 7,
 	SYS_WEATHER		= 9,

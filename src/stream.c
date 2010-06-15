@@ -335,7 +335,8 @@ next_packet (CurrentState         *state,
 			packet->data = LONG_PACKET_DATA (pbuf);
 			decrypt = 0;
 			break;
-		case SYS_END_OF_STREAM:
+		case SYS_VALID_MARKER:
+		case SYS_REFRESH_RATE:
 			packet->len = 0;
 			packet->data = 0;
 			decrypt = 0;
