@@ -149,11 +149,11 @@ main (int   argc,
 
 	free (config_file);
 
-
-	state->cookie = obtain_auth_cookie (state->auth_host, ssl,
-					    state->email, state->password);
-	if (! state->cookie)
-		return 2;
+	do
+	{
+		state->cookie = obtain_auth_cookie (state->auth_host, ssl, state->email, state->password);
+	}
+	while (! state->cookie);
 
 	for (;;) {
 		int ret;

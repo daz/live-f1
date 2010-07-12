@@ -149,9 +149,8 @@ obtain_auth_cookie (const char *host,
 
 	if (! cookie) {
 		fprintf (stderr, "%s: %s\n", program_name,
-			 _("login failed: check email and password"));
-
-		goto error;
+			 _("login failed: check email and password in ~/.f1rc"));
+		goto fatal_error;
 	}
 
 error:
@@ -159,6 +158,12 @@ error:
 	ne_session_destroy (sess);
 
 	return cookie;
+
+fatal_error:
+	ne_request_destroy (req);
+	ne_session_destroy (sess);
+
+	exit (2);
 }
 
 /**
