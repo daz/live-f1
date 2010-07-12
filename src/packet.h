@@ -114,6 +114,22 @@ typedef enum {
 	SYS_COPYRIGHT		= 12,
 	LAST_SYSTEM_PACKET
 } SystemPacketType;
+	
+/**
+ * WeatherPacketType:
+ *
+ * Sub-types of the SYS_WEATHER packet.
+ **/
+typedef enum {
+	WEATHER_SESSION_CLOCK	= 0,
+	WEATHER_TRACK_TEMP	= 1,
+	WEATHER_AIR_TEMP	= 2,
+	WEATHER_WET_TRACK	= 3,
+	WEATHER_WIND_SPEED	= 4,
+	WEATHER_HUMIDITY	= 5,
+	WEATHER_PRESSURE	= 6,
+	WEATHER_WIND_DIRECTION	= 7
+} WeatherPacketType;
 
 /**
  * Packet:

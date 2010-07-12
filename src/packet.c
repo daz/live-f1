@@ -176,6 +176,14 @@ handle_system_packet (CurrentState *state,
 		state->remaining_time = 0;
 		state->lap = 0;
 		state->flag = GREEN_FLAG;
+
+		state->track_temp = 0;
+		state->air_temp = 0;
+		state->wind_speed = 0;
+		state->humidity = 0;
+		state->pressure = 0;
+		state->wind_direction = 0;
+		
 		state->num_cars = 0;
 		if (state->car_position) {
 			free (state->car_position);
@@ -228,7 +236,7 @@ handle_system_packet (CurrentState *state,
 		 * changing of the data over time.
 		 */
 		switch (packet->data) {
-		case 0:
+		case WEATHER_SESSION_CLOCK:
 			/* Session time remaining.
 			 * This is only sent once a minute in H:MM:SS format,
 			 * we therefore parse it and use it to update our
@@ -267,6 +275,66 @@ handle_system_packet (CurrentState *state,
 
 			close_popup ();
 			update_time (state);
+			break;
+		case WEATHER_TRACK_TEMP:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				number += packet->payload[i] - '0';
+			}
+			state->track_temp = number;
+			update_status (state);
+			break;
+		case WEATHER_AIR_TEMP:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				number += packet->payload[i] - '0';
+			}
+			state->air_temp = number;
+			update_status (state);
+			break;
+		case WEATHER_WIND_SPEED:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				if (packet->payload[i] != '.')
+				{
+					number += packet->payload[i] - '0';
+				}
+			}
+			state->wind_speed = number;
+			update_status (state);
+			break;
+		case WEATHER_HUMIDITY:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				number += packet->payload[i] - '0';
+			}
+			state->humidity = number;
+			update_status (state);
+			break;
+		case WEATHER_PRESSURE:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				if (packet->payload[i] != '.')
+				{
+					number += packet->payload[i] - '0';
+				}
+			}
+			state->pressure = number;
+			update_status (state);
+			break;
+		case WEATHER_WIND_DIRECTION:
+			number = 0;
+			for (i = 0; i < packet->len; i++) {
+				number *= 10;
+				number += packet->payload[i] - '0';
+			}
+			state->wind_direction = number;
+			update_status (state);
 			break;
 		default:
 			/* Unhandled field */

@@ -175,6 +175,14 @@ main (int   argc,
 		state->remaining_time = 0;
 		state->lap = 0;
 		state->flag = GREEN_FLAG;
+
+		state->track_temp = 0;
+		state->air_temp = 0;
+		state->wind_speed = 0;
+		state->humidity = 0;
+		state->pressure = 0;
+		state->wind_direction = 0;
+
 		state->num_cars = 0;
 		if (state->car_position) {
 			free (state->car_position);

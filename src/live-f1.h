@@ -93,6 +93,12 @@ typedef struct {
  * @end_time: time the session will end,
  * @lap: current lap,
  * @flag: track status or flag,
+ * @track_temp: current track temperature (degrees C),
+ * @air_temp: current air temperature (degrees C),
+ * @wind_speed: current wind speed (meters per second),
+ * @humidity_temp: current humidity (percentage),
+ * @pressure: current barometric pressure (millibars),
+ * @wind_direction: current wind direction (destination in degrees),
  * @num_cars: number of cars in the event,
  * @car_position: current position of car,
  * @car_info: arrays of information about each car.
@@ -111,6 +117,13 @@ typedef struct {
 	time_t         remaining_time, epoch_time;
 	unsigned int   lap;
 	FlagStatus     flag;
+
+	int            track_temp;
+	int            air_temp;
+	int            wind_speed;
+	int            humidity;
+	int            pressure;
+	int            wind_direction;
 
 	int            num_cars;
 	int           *car_position;

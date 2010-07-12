@@ -190,7 +190,7 @@ clear_board (CurrentState *state)
 	}
 
 	boardwin = newwin (nlines, 69, 0, 0);
-	wbkgdset (boardwin, attrs[COLOUR_DEFAULT]);
+	wbkgdset (boardwin, attrs[COLOUR_DATA]);
 	werase (boardwin);
 
 	if (header) {
@@ -595,11 +595,12 @@ update_status (CurrentState *state)
 			return;
 
 		statwin = newwin (nlines, 10, 0, COLS - 10);
-		wbkgdset (statwin, attrs[COLOUR_DEFAULT]);
+		wbkgdset (statwin, attrs[COLOUR_DATA]);
 		werase (statwin);
 	}
 
-	/* Output the race status */
+	/* Session status */
+
 	wmove (statwin, 2, 0);
 	wclrtoeol (statwin);
 	switch (state->flag) {
@@ -624,6 +625,7 @@ update_status (CurrentState *state)
 	}
 
 	/* Number of laps, or event type */
+
 	wattrset (statwin, attrs[COLOUR_DATA]);
 	wmove (statwin, 0, 0);
 	wclrtoeol (statwin);
@@ -639,7 +641,65 @@ update_status (CurrentState *state)
 		break;
 	}
 
+	/* Display weather */
+
+	int wline = 5;
+	wattrset (statwin, attrs[COLOUR_DATA]);
+ 
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw(statwin,"%-6s%2d C", "Track", state->track_temp);
+	wmove (statwin, wline, 8);
+	waddch (statwin, ACS_DEGREE);
+
+	wline += 2;
+
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw(statwin,"%-6s%2d C", "Air", state->air_temp);
+	wmove (statwin, wline, 8);
+	waddch (statwin, ACS_DEGREE);
+
+	wline += 2;
+
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw (statwin, "%-6s%3d", "Wind", state->wind_direction);
+	waddch (statwin, ACS_DEGREE);
+	wline++;
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw (statwin, "%-4s%03dm/s", "", state->wind_speed);
+	wmove (statwin, wline, 5);
+	waddch (statwin, '.');
+
+	wline += 2;
+
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw(statwin, "Humidity");
+	wline++;
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw (statwin, "%-6s%3d%%", "", state->humidity);
+
+	wline += 2;
+
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw(statwin, "Pressure");
+	wline++;
+	wmove (statwin, wline, 0);
+	wclrtoeol (statwin);
+	wprintw(statwin, "%-2s%6dmb", "", state->pressure);
+	wmove (statwin, wline, 6);
+	waddch (statwin, '.');
+
+	/* Update session clock */
+	
 	_update_time (state);
+
+	/* Refresh display */
 
 	wnoutrefresh (statwin);
 	doupdate ();
