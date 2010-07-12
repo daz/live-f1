@@ -85,6 +85,7 @@ typedef struct {
  * @cookie: user's authorisation cookie,
  * @key: decryption key,
  * @salt: current decryption salt,
+ * @decryption_failure: indicates if payload decryption has failed (0=no,1=yes),
  * @frame: last seen key frame,
  * @event_no: event number,
  * @event_type: event type,
@@ -110,6 +111,7 @@ typedef struct {
 	char          *host, *auth_host;
 	char          *email, *password, *cookie;
 	unsigned int   key, salt;
+	int            decryption_failure;
 	unsigned int   frame;
 
 	unsigned int   event_no;

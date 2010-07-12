@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <regex.h>
 
 #include "live-f1.h"
 #include "display.h"
@@ -114,6 +115,27 @@ handle_car_packet (CurrentState *state,
 		 * for the car, some (with no length) only update the colour
 		 * of a field.
 		 */
+
+		/* Check for decryption failure */
+
+		if ((packet->type == 1) && (packet->len >= 0))
+		{
+			regex_t re;
+
+			regcomp(&re, "^[1-9][0-9]?$|^$", REG_EXTENDED|REG_NOSUB);
+
+			if (regexec(&re, packet->payload, (size_t)0, NULL, 0) == 0)
+			{
+				state->decryption_failure = 0;
+			} else {
+				state->decryption_failure = 1;
+			}
+
+			regfree (&re);
+		}
+
+		/* Store the atom */
+
 		atom = &state->car_info[packet->car - 1][packet->type];
 		atom->data = packet->data;
 		if (packet->len >= 0)
@@ -215,7 +237,8 @@ handle_system_packet (CurrentState *state,
 		}
 
 		reset_decryption (state);
-		if (! state->frame) {
+		if ((!state->frame) || (state->decryption_failure))
+		{
 			state->frame = number;
 			obtain_key_frame (state->host, number, state);
 			reset_decryption (state);
