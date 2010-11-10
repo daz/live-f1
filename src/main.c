@@ -183,6 +183,15 @@ main (int   argc,
 		state->pressure = 0;
 		state->wind_direction = 0;
 
+		if (state->fl_car) free (state->fl_car);
+		state->fl_car = calloc(3, sizeof(char));
+		if (state->fl_driver) free (state->fl_driver);
+		state->fl_driver = calloc(15, sizeof(char));
+		if (state->fl_time) free (state->fl_time);
+		state->fl_time = calloc(9, sizeof(char));
+		if (state->fl_lap) free (state->fl_lap);
+		state->fl_lap = calloc(3, sizeof(char));
+		
 		state->num_cars = 0;
 		if (state->car_position) {
 			free (state->car_position);

@@ -132,6 +132,22 @@ typedef enum {
 } WeatherPacketType;
 
 /**
+ * SpeedPacketType:
+ *
+ * Sub-types of the SYS_SPEED packet.
+ **/
+typedef enum {
+	SPEED_SECTOR1		= 1,
+	SPEED_SECTOR2		= 2,
+	SPEED_SECTOR3		= 3,
+	SPEED_TRAP		= 4,
+	FL_CAR			= 5,
+	FL_DRIVER		= 6,
+	FL_TIME			= 7,
+	FL_LAP			= 8
+} SpeedPacketType;
+
+/**
  * Packet:
  * @car: index of car,
  * @type: type of packet,

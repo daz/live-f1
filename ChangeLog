@@ -1,3 +1,19 @@
+2010-11-10  Dave Pusey  <dave@puseyuk.co.uk>
+
+	* Added display of Fastest Lap information during the race.
+
+2010-07-12  Dave Pusey  <dave@puseyuk.co.uk>
+
+	* Auto retry if obtain_auth_cookie fails.
+
+	* Auto recovery from decryption failure.
+
+	* Added display of Weather information.
+
+2010-06-11  Dave Pusey  <dave@puseyuk.co.uk>
+
+	* Fixed Bug #587493: Handle system messages that begin with "img:".
+
 2010-05-26  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* Fixed Bug #580064: libintl error when compiling on MacOS X.

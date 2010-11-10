@@ -206,6 +206,15 @@ handle_system_packet (CurrentState *state,
 		state->pressure = 0;
 		state->wind_direction = 0;
 		
+		if (state->fl_car) free (state->fl_car);
+		state->fl_car = calloc(3, sizeof(char));
+		if (state->fl_driver) free (state->fl_driver);
+		state->fl_driver = calloc(15, sizeof(char));
+		if (state->fl_time) free (state->fl_time);
+		state->fl_time = calloc(9, sizeof(char));
+		if (state->fl_lap) free (state->fl_lap);
+		state->fl_lap = calloc(3, sizeof(char));
+	
 		state->num_cars = 0;
 		if (state->car_position) {
 			free (state->car_position);
@@ -357,6 +366,35 @@ handle_system_packet (CurrentState *state,
 				number += packet->payload[i] - '0';
 			}
 			state->wind_direction = number;
+			update_status (state);
+			break;
+		default:
+			/* Unhandled field */
+			break;
+		}
+		break;
+	case SYS_SPEED:
+		/* Speed and Fastest Lap data:
+		 * Format: single byte, then string.
+		 *
+		 * The first payload byte indicates which piece of
+		 * information to change.
+		 */
+		switch (packet->payload[0]) {
+		case FL_CAR:
+			memcpy(state->fl_car, packet->payload+1, 2);
+			update_status (state);
+			break;
+		case FL_DRIVER:
+			memcpy(state->fl_driver, packet->payload+1, 14);
+			update_status (state);
+			break;
+		case FL_TIME:
+			memcpy(state->fl_time, packet->payload+1, 8);
+			update_status (state);
+			break;
+		case FL_LAP:
+			memcpy(state->fl_lap, packet->payload+1, 2);
 			update_status (state);
 			break;
 		default:

@@ -67,9 +67,6 @@ int cursed = 0;
 /* Number of lines being used for the board */
 static int nlines = 0;
 
-/* Did we have room for the header? */
-static int header = 0;
-
 /* Attributes for the colours */
 static int attrs[LAST_COLOUR];
 
@@ -167,15 +164,12 @@ clear_board (CurrentState *state)
 	if (boardwin)
 		delwin (boardwin);
 
-	nlines = MAX (state->num_cars, 22);
+	nlines = MAX (state->num_cars, 21);
 	for (i = 0; i < state->num_cars; i++)
 		nlines = MAX (nlines, state->car_position[i]);
-	if (nlines + 1 <= LINES) {
-		header = 1;
-		nlines += 1;
-	} else {
-		header = 0;
-	}
+
+	nlines += 3;
+
 	if (LINES < nlines) {
 		close_display ();
 		fprintf (stderr, "%s: %s\n", program_name,
@@ -193,7 +187,6 @@ clear_board (CurrentState *state)
 	wbkgdset (boardwin, attrs[COLOUR_DATA]);
 	werase (boardwin);
 
-	if (header) {
 		switch (state->event_type) {
 		case RACE_EVENT:
 			mvwprintw (boardwin, 0, 0,
@@ -216,7 +209,6 @@ clear_board (CurrentState *state)
 				   _("Sec 2"), _("Sec 3"), _("Lp"));
 			break;
 		}
-	}
 
 	for (i = 1; i <= state->num_cars; i++) {
 		for (j = 0; j < LAST_CAR_PACKET; j++)
@@ -257,8 +249,6 @@ _update_cell (CurrentState *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
-	if (! header)
-		y--;
 	if (nlines < y)
 		clear_board (state);
 
@@ -541,8 +531,6 @@ clear_car (CurrentState *state,
 	y = state->car_position[car - 1];
 	if (! y)
 		return;
-	if (! header)
-		y--;
 	if (nlines < y)
 		clear_board (state);
 
@@ -695,6 +683,16 @@ update_status (CurrentState *state)
 	wmove (statwin, wline, 6);
 	waddch (statwin, '.');
 
+	/* Update fastest lap line (race only) */
+
+	if (state->event_type == RACE_EVENT)
+	{
+		wmove (boardwin, nlines - 1, 3);
+		wattrset (boardwin, attrs[COLOUR_RECORD]);
+		wclrtoeol (boardwin);
+		wprintw(boardwin, "%2s %-14s %4s %4s %8s", state->fl_car, state->fl_driver, "LAP", state->fl_lap, state->fl_time);
+	}
+
 	/* Update session clock */
 	
 	_update_time (state);
@@ -702,6 +700,7 @@ update_status (CurrentState *state)
 	/* Refresh display */
 
 	wnoutrefresh (statwin);
+	wnoutrefresh (boardwin);
 	doupdate ();
 }
 

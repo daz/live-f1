@@ -96,10 +96,14 @@ typedef struct {
  * @flag: track status or flag,
  * @track_temp: current track temperature (degrees C),
  * @air_temp: current air temperature (degrees C),
+ * @humidity: current humidity (percentage),
  * @wind_speed: current wind speed (meters per second),
- * @humidity_temp: current humidity (percentage),
- * @pressure: current barometric pressure (millibars),
  * @wind_direction: current wind direction (destination in degrees),
+ * @pressure: current barometric pressure (millibars),
+ * @fl_car: fastest lap (car number),
+ * @fl_driver: fastest lap (driver's name),
+ * @fl_time: fastest lap (lap time),
+ * @fl_lap: fastest lap (lap number),
  * @num_cars: number of cars in the event,
  * @car_position: current position of car,
  * @car_info: arrays of information about each car.
@@ -120,13 +124,11 @@ typedef struct {
 	unsigned int   lap;
 	FlagStatus     flag;
 
-	int            track_temp;
-	int            air_temp;
-	int            wind_speed;
-	int            humidity;
-	int            pressure;
-	int            wind_direction;
+	int            track_temp, air_temp, humidity;
+	int            wind_speed, wind_direction, pressure;
 
+	char          *fl_car, *fl_driver, *fl_time, *fl_lap;
+	
 	int            num_cars;
 	int           *car_position;
 	CarAtom      **car_info;
