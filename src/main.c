@@ -173,7 +173,8 @@ main (int   argc,
 		state->event_type = RACE_EVENT;
 		state->epoch_time = 0;
 		state->remaining_time = 0;
-		state->lap = 0;
+		state->laps_completed = 0;
+		state->total_laps = 0;
 		state->flag = GREEN_FLAG;
 
 		state->track_temp = 0;

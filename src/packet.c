@@ -154,7 +154,7 @@ handle_car_packet (CurrentState *state,
 				number += packet->payload[i] - '0';
 			}
 
-			state->lap = number + 1;
+			state->laps_completed = number;
 			update_status (state);
 		}
 		break;
@@ -196,7 +196,8 @@ handle_system_packet (CurrentState *state,
 		state->event_type = packet->data;
 		state->epoch_time = 0;
 		state->remaining_time = 0;
-		state->lap = 0;
+		state->laps_completed = 0;
+		state->total_laps = obtain_total_laps();
 		state->flag = GREEN_FLAG;
 
 		state->track_temp = 0;

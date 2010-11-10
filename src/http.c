@@ -50,6 +50,7 @@ static int  check_auth_cert  (void *userdata, int failures,
 			      const ne_ssl_certificate *cert);
 static void parse_cookie_hdr (char **value, const char  *header);
 static int  parse_key_body   (unsigned int *key, const char *buf, size_t len);
+static int  parse_number_body();
 
 
 /**
@@ -360,6 +361,66 @@ obtain_key_frame (const char   *host,
 
 	ne_request_destroy (req);
 	ne_session_destroy (sess);
+
+	return 0;
+}
+
+/**
+ * obtain_total_laps:
+ *
+ * Obtains the total number of laps for the race.
+ *
+ * Returns: total obtained on success, or zero on failure.
+ **/
+unsigned int
+obtain_total_laps ()
+{
+	ne_session   *sess;
+	ne_request   *req;
+	unsigned int  total_laps = 0;
+
+	sess = ne_session_create ("http", WEBSERVICE_HOST, 80);
+	ne_set_useragent (sess, PACKAGE_STRING);
+
+	/* Create the request */
+	req = ne_request_create (sess, "GET", "/laps.php");
+	ne_add_response_body_reader (req, ne_accept_2xx,
+				     (ne_block_reader) parse_number_body, &total_laps);
+
+	/* Dispatch the request */
+	ne_request_dispatch (req);
+
+	ne_request_destroy (req);
+	ne_session_destroy (sess);
+
+	return total_laps;
+}
+
+/**
+ * parse_number_body:
+ * @result: pointer to store result in,
+ * @buf: buffer of data received from server,
+ * @len: length of buffer.
+ *
+ * Parse data received from the server in response to the request,
+ * converting from ascii number digitsfilling the decryption key while we can see hexadecimal digits.
+ **/
+static int
+parse_number_body (unsigned int *result,
+		const char   *buf,
+		size_t        len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		if ((buf[i] >= '0') && (buf[i] <= '9'))
+		{
+			*result *= 10;
+			*result += buf[i] - '0';
+		} else {
+			break;
+		}
+	}
 
 	return 0;
 }

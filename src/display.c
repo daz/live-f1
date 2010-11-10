@@ -619,7 +619,17 @@ update_status (CurrentState *state)
 	wclrtoeol (statwin);
 	switch (state->event_type) {
 	case RACE_EVENT:
-		wprintw (statwin, "Lap %2d", state->lap);
+		switch (state->total_laps - state->laps_completed) {
+		case 0:
+			wprintw (statwin, "%10s", "FINISHED");
+			break;
+		case 1:
+			wprintw (statwin, "%10s", "FINAL LAP");
+			break;
+		default:
+			wprintw (statwin, "%4d TO GO", state->total_laps - state->laps_completed);
+			break;
+		}
 		break;
 	case PRACTICE_EVENT:
 		wprintw (statwin, "Practice");
@@ -718,7 +728,7 @@ _update_time (CurrentState *state)
 	if (! statwin)
 		return;
 
-	wmove (statwin, nlines - 1, 0);
+	wmove (statwin, nlines - 1, 2);
 	wattrset (statwin, attrs[COLOUR_DATA]);
 
 	// Pause the clock during a red flag, but only for Qualifying and the Race.

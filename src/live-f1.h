@@ -29,6 +29,7 @@
 /* Default hostnames to contact */
 #define DEFAULT_HOST      "live-timing.formula1.com"
 #define DEFAULT_AUTH_HOST "secure.formula1.com"
+#define WEBSERVICE_HOST   "live-f1.puseyuk.co.uk"
 
 /* Make gettext a little friendlier */
 #define _(_str) gettext (_str)
@@ -92,7 +93,8 @@ typedef struct {
  * @remaining_time: time remaining for the event,
  * @epoch_time: epoch time @remaining_time was updated,
  * @end_time: time the session will end,
- * @lap: current lap,
+ * @laps_completed: the number of laps completed during the race,
+ * @total_laps: the total number of laps for the grand prix,
  * @flag: track status or flag,
  * @track_temp: current track temperature (degrees C),
  * @air_temp: current air temperature (degrees C),
@@ -121,7 +123,7 @@ typedef struct {
 	unsigned int   event_no;
 	EventType      event_type;
 	time_t         remaining_time, epoch_time;
-	unsigned int   lap;
+	unsigned int   laps_completed, total_laps;
 	FlagStatus     flag;
 
 	int            track_temp, air_temp, humidity;
