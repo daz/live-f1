@@ -1,3 +1,9 @@
+2011-03-27  Dave Pusey  <dave@puseyuk.co.uk>
+
+	* Completely stripped out the SSL code. It was disabled in 0.2.10 due to an intermittent hanging
+	  problem, and is now seeming to cause "Server certificate verification failed: issuer is not
+	  trusted" errors even though it is disabled.
+
 2010-11-10  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* Added display of Fastest Lap information during the race.

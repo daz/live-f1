@@ -25,7 +25,7 @@
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (const char *host, int ssl,
+char *       obtain_auth_cookie    (const char *host,
 				    const char *email, const char *password);
 unsigned int obtain_decryption_key (const char *host, unsigned int event_no,
 				    const char *cookie);

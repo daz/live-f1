@@ -28,7 +28,6 @@
 
 /* Default hostnames to contact */
 #define DEFAULT_HOST      "live-timing.formula1.com"
-#define DEFAULT_AUTH_HOST "secure.formula1.com"
 #define WEBSERVICE_HOST   "live-f1.puseyuk.co.uk"
 
 /* Make gettext a little friendlier */

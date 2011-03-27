@@ -40,14 +40,8 @@
 #define KEY_URL_BASE        "/reg/getkey/"
 #define KEYFRAME_URL_PREFIX "/keyframe"
 
-/* Parts of the certificate we check */
-#define CERT_IDENTITY	    "secure.formula1.com"
-#define CERT_DIGEST         "89:e7:70:73:49:84:f6:c6:08:03:6c:28:57:c0:ec:cc:4a:b3:68:f9"
-
 
 /* Forward prototypes */
-static int  check_auth_cert  (void *userdata, int failures,
-			      const ne_ssl_certificate *cert);
 static void parse_cookie_hdr (char **value, const char  *header);
 static int  parse_key_body   (unsigned int *key, const char *buf, size_t len);
 static int  parse_number_body();
@@ -74,7 +68,6 @@ numlen (unsigned int number)
 /**
  * obtain_auth_cookie:
  * @host: host to obtain cookie from,
- * @ssl: whether to use https,
  * @email: e-mail address registered with the F1 website,
  * @password: paassword registered for @email.
  *
@@ -88,7 +81,6 @@ numlen (unsigned int number)
  **/
 char *
 obtain_auth_cookie (const char *host,
-		    int         ssl,
 		    const char *email,
 		    const char *password)
 {
@@ -107,13 +99,7 @@ obtain_auth_cookie (const char *host,
 	free (e_password);
 	free (e_email);
 
-	if (ssl) {
-		sess = ne_session_create ("https", host, 443);
-		ne_ssl_set_verify (sess, (ne_ssl_verify_fn) check_auth_cert,
-				   NULL);
-	} else {
-		sess = ne_session_create ("http", host, 80);
-	}
+	sess = ne_session_create ("http", host, 80);
 	ne_set_useragent (sess, PACKAGE_STRING);
 
 	/* Create the request */
@@ -165,32 +151,6 @@ fatal_error:
 	ne_session_destroy (sess);
 
 	exit (2);
-}
-
-/**
- * check_auth_cert:
- * @userdata: always NULL,
- * @failures: reasons for verification failure,
- * @cert: certificate received.
- *
- * Check the particulars of the SSL certificate to make sure the identity
- * and fingerprint match what we expected.
- **/
-static int check_auth_cert  (void                     *userdata,
-			     int                       failures,
-			     const ne_ssl_certificate *cert)
-{
-	char digest[NE_SSL_DIGESTLEN];
-
-	if (strcmp (ne_ssl_cert_identity (cert), CERT_IDENTITY))
-		return 1;
-
-	if (ne_ssl_cert_digest (cert, digest))
-		return 1;
-	if (strcmp (digest, CERT_DIGEST))
-		return 1;
-
-	return 0;
 }
 
 /**

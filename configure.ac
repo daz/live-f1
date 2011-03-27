@@ -1,8 +1,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.59)
-AC_INIT([live-f1], [0.2.11beta3], [https://bugs.launchpad.net/live-f1])
-AC_COPYRIGHT([[Copyright © 2010 Scott James Remnant <scott@netsplit.com>.]])
+AC_INIT([live-f1], [0.2.11beta5], [https://bugs.launchpad.net/live-f1])
+AC_COPYRIGHT([[Copyright (C) 2011, Dave Pusey <dave@puseyuk.co.uk>]])
 AC_CONFIG_SRCDIR([src/main.c])
 AC_CONFIG_MACRO_DIR([m4])
 

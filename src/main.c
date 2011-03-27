@@ -75,7 +75,7 @@ main (int   argc,
 	CurrentState *state;
 	const char   *home_dir;
 	char         *config_file;
-	int           opt, sock, ssl;
+	int           opt, sock;
 
 	setlocale (LC_ALL, "");
 	bindtextdomain (PACKAGE, LOCALEDIR);
@@ -140,18 +140,16 @@ main (int   argc,
 			return 1;
 	}
 
-	ssl = 0;
-
 	if (! state->host)
 		state->host = DEFAULT_HOST;
 	if (! state->auth_host)
-		state->auth_host = ssl ? DEFAULT_AUTH_HOST : DEFAULT_HOST;
+		state->auth_host = DEFAULT_HOST;
 
 	free (config_file);
 
 	do
 	{
-		state->cookie = obtain_auth_cookie (state->auth_host, ssl, state->email, state->password);
+		state->cookie = obtain_auth_cookie (state->auth_host, state->email, state->password);
 	}
 	while (! state->cookie);
 
@@ -273,7 +271,7 @@ static void
 print_version (void)
 {
 	printf ("%s\n", PACKAGE_STRING);
-	printf ("Copyright (C) 2010 Scott James Remnant <scott@netsplit.com>.\n");
+	printf ("Copyright (C) 2011, Dave Pusey <dave@puseyuk.co.uk>\n");
 	printf ("\n");
 	printf (_("This is free software, covered by the GNU General Public License; see the\n"
 		  "source for copying conditions.  There is NO warranty; not even for\n"
