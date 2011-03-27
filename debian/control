@@ -1,18 +1,17 @@
 Source: live-f1
-Section: misc
+Section: net
 Priority: optional
-Maintainer: Fabio M. Di Nitto <fabbione@ubuntu.com>
-Standards-Version: 3.6.2
-Build-Depends: debhelper (>= 4.2.28), libncurses5-dev, libneon24-dev, libssl-dev, libxml2-dev, zlib1g-dev
+Maintainer: Dave Pusey <dave@puseyuk.co.uk>
+Build-Depends: debhelper (>= 7), autotools-dev, libncurses5-dev, libneon27-gnutls-dev
+Standards-Version: 3.9.1
+Homepage: https://launchpad.net/live-f1
 
 Package: live-f1
-Section: misc
-Priority: optional
 Architecture: any
-Depends: ${shlibs:Depends}
-Description: formula1.com text based client
- This tiny client is capable of grab and display the real time stream
- from formula1.com without the need of a java-enabled browser.
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Formula 1 Live Timing
+ The official Formula 1 website includes a Java client, which during races, qualifying, and practice sessions, displays the Live Timing information from the circuit.
  .
- NOTE: this software requires an account on formula1.com and it is still
- experimental.
+ This native Linux client displays information from the same Live Timing feed, without the need for a Java-enabled web browser.
+ .
+ A free user account at formula1.com is required to access the Live Timing feed..

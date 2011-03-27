@@ -1,81 +1,105 @@
 #!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
 
 # Uncomment this to turn on verbose mode.
-# export DH_VERBOSE=1
+#export DH_VERBOSE=1
 
-configure: configure-stamp
-configure-stamp:
+
+# These are used for cross-compiling and for saving the configure script
+# from having to guess our platform (since we know it already)
+DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
+DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
+ifneq ($(DEB_HOST_GNU_TYPE),$(DEB_BUILD_GNU_TYPE))
+CROSS= --build $(DEB_BUILD_GNU_TYPE) --host $(DEB_HOST_GNU_TYPE)
+else
+CROSS= --build $(DEB_BUILD_GNU_TYPE)
+endif
+
+
+
+config.status: configure
+	dh_testdir
+	# Add here commands to configure the package.
+ifneq "$(wildcard /usr/share/misc/config.sub)" ""
+	cp -f /usr/share/misc/config.sub config.sub
+endif
+ifneq "$(wildcard /usr/share/misc/config.guess)" ""
+	cp -f /usr/share/misc/config.guess config.guess
+endif
+	./configure $(CROSS) --prefix=/usr --mandir=\$${prefix}/share/man --infodir=\$${prefix}/share/info CFLAGS="$(CFLAGS)" LDFLAGS="-Wl,-z,defs"
+
+
+build: build-stamp
+
+build-stamp:  config.status 
 	dh_testdir
 
-	if [ ! -x configure ]; then \
-	  if [ ! -x /usr/bin/autoreconf ]; then \
-	    echo "Hey dude.. gimme a break.. you need to autoreconf the source!"; \
-	    exit 1; \
-	  else \
-	    echo "Dude.. you should do this stuff before release.."; \
-	    autoreconf --install --force --verbose; \
-	    touch OMG-AUTORECONF; \
-	  fi \
-	fi
-
-	./configure --prefix=/usr
-
-	touch $@
-
-build: configure build-stamp
-build-stamp:
-	dh_testdir
-
+	# Add here commands to compile the package.
 	$(MAKE)
+	#docbook-to-man debian/live-f1.sgml > live-f1.1
 
 	touch $@
-
-install: build
-	dh_testdir
-	dh_testroot
-	dh_clean -k
-
-	$(MAKE) install DESTDIR=`pwd`/debian/live-f1/
-
-	dh_installdocs README ChangeLog AUTHORS
-	dh_installchangelogs
-
-
-binary-arch: install
-	dh_testdir
-	dh_testroot
-	dh_strip -a
-	dh_compress -a
-	dh_fixperms -a
-	dh_installdeb -a
-	dh_shlibdeps -a
-	dh_gencontrol -a
-	dh_md5sums -a
-	dh_builddeb -a
-
-binary-indep: install
-	#nothing to do
-
-binary: binary-arch binary-indep
 
 clean: 
 	dh_testdir
 	dh_testroot
-	dh_clean
+	rm -f build-stamp 
 
-	rm -rf *-stamp
-	-$(MAKE) clean
-	if [ -f OMG-AUTORECONF ]; then \
-	  make distclean || true; \
-	  rm -rf autom4te.cache config.{guess,rpath,status,sub} \
-		install-sh configure depcomp missing mkinstalldirs \
-		ABOUT-NLS aclocal.m4 config.h.in \
-		INSTALL Makefile.in OMG-AUTORECONF \
-		intl src/Makefile.in \
-		m4/{xsize,wint_t,wchar_t,ulonglong,uintmax_t,stdint_h,size_max,signed}.m4 \
-		m4/{progtest,printf-posix,po,nls,longlong,longdouble,lib-prefix,lib-link}.m4 \
-		m4/{lib-ld,lcmessage,isc-posix,inttypes_h,inttypes,inttypes-pri,intmax}.m4 \
-		m4/{intdiv0,iconv,glibc21,glibc2,gettext,codeset}.m4 \
-		po/{stamp-po,remove-potcdate.sin,quot.sed,live-f1.pot,insert-header.sin} \
-		po/{en@quot.header,en@boldquot.header,boldquot.sed,Rules-quot,Makevars.template,Makefile.in.in}; \
-	fi
+	# Add here commands to clean up after the build process.
+	[ ! -f Makefile ] || $(MAKE) distclean
+	rm -f config.sub config.guess
+
+	dh_clean 
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_clean -k 
+	dh_installdirs
+
+	# Add here commands to install the package into debian/live-f1.
+	$(MAKE) DESTDIR=$(CURDIR)/debian/live-f1 install
+
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs ChangeLog
+	dh_installdocs
+	dh_installexamples
+#	dh_install
+#	dh_installmenu
+#	dh_installdebconf	
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+#	dh_python
+#	dh_installinit
+#	dh_installcron
+#	dh_installinfo
+	dh_installman
+	dh_link
+	dh_strip
+	dh_compress
+	dh_fixperms
+#	dh_perl
+#	dh_makeshlibs
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install 

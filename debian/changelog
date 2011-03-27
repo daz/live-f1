@@ -1,5 +1,5 @@
-live-f1 (0+20051014) dapper; urgency=low
+live-f1 (0.2.11-davepusey1) karmic; urgency=low
 
-  * First packaging.
+  * Upstream release 0.2.11
 
- -- Fabio M. Di Nitto <fabbione@ubuntu.com>  Fri, 14 Oct 2005 11:23:50 +0200
+ -- Dave Pusey <dave@puseyuk.co.uk>  Sun, 27 Mar 2011 19:01:39 +0100
