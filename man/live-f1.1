@@ -1,34 +1,28 @@
-.TH LIVE-F1 1 2010-05-26 "Dave Pusey" "Live F1 0.2.10"
+.TH LIVE-F1 1 2011-03-27 "Dave Pusey" "Live F1 0.2.11"
 .SH NAME
 live-f1 - Formula 1 Live Timing client.
 .SH SYNOPSIS
 live-f1 [options]
 .SH DESCRIPTION
-The official Formula 1 website includes a Java client, which during races, qualifying, and practice sessions, displays the Live Timing information from the race track.
+The official Formula 1 website includes a Java client, which during races, qualifying, and practice sessions, displays the Live Timing information from the circuit.
 
 This native Linux client displays information from the same Live Timing feed, without the need for a Java-enabled web browser.
 .SH OPTIONS
--v, --verbose
-.br
-			Increases verbosity level. Can be used multiple times.
+-v, --verbose	Increases verbosity level. Can be used multiple times.
 
---help
-.br
-			Displays usage information and then exits.
+--help		Displays usage information and then exits.
 
---version
-.br
-			Displays version information and then exits.
+--version		Displays version information and then exits.
 .SH HOMEPAGE
 https://launchpad.net/live-f1
 .SH REPORT BUGS
 https://bugs.launchpad.net/live-f1
 .SH CONFIGURATION
-To access the Live Timing feed, you will need to register for a user account at:
+To be able to access the Live Timing feed, you will need to register for a free user account at:
 
 http://www.formula1.com/reg/registration
 
-When run for the first time, you will be prompted for your formula1.com username and password. Once entered, this information is stored in ~/.f1rc for future sessions.
+When run for the first time, you will be prompted for your formula1.com username and password. Once entered, this information is stored in ~/.f1rc for future sessions. In the event you need to update your formula1.com username and password, just edit this file.
 .SH DISPLAY COLOURS
 YELLOW		Default colour.
 
@@ -40,7 +34,7 @@ GREEN		Personal best.
 
 PURPLE		Overall best.
 
-GREY			Driver has been knocked out of qualifying.
+GREY			Driver has been eliminated during qualifying.
 .SH PRACTICE COLUMNS
 P			Current position.
 
@@ -62,7 +56,13 @@ P			Current position.
 
 NAME			Driver's name.
 
-PERIOD 1		Personal best lap time during the first session.
+PERIOD 1		Personal best lap time during the first session. White
+.br
+			indicates the lap time is within 107% of the P1 best lap
+.br
+			time. Yellow indicates the lap time is outside 107% of
+.br
+			the P1 best lap time.
 
 PERIOD 2		Personal best lap time during the second session.
 
@@ -82,11 +82,11 @@ NAME			Driver's name.
 
 GAP			Distance from the leader, in seconds.
 
-INT			Distance from the car ahead, in seconds. Yellow
+INT			Distance from the car ahead, in seconds. White
 .br
-			indicates the distance has increased since the previous
+			indicates the distance has decreased since the previous
 .br
-			lap. White indicates the distance has decreased since
+			lap. Yellow indicates the distance has increased since
 .br
 			the previous lap.
 
@@ -100,12 +100,14 @@ SECTOR 3		Sector 3 time for the current lap.
 
 PS			Number of times the car has entered the pit lane.
 .SH TRACK STATUS
-The current track status is shown in the top-right of the display.
+The current track status is shown at the top right of the display.
 
-Yellow Flags	A yellow bar will be displayed.
+Yellow Flag	A yellow bar will be displayed.
 
 Safety Car	A yellow bar and the words SAFETY CAR will be displayed.
 
 Red Flag		A red bar will be displayed.
 .SH SESSION CLOCK
-The remaining time for the current session is shown in the bottom-right of the display.
+The remaining time for the current session is shown at the bottom right of the display.
+.SH FASTEST LAP
+During the race, the fastest lap is shown, in purple, at the bottom of the display.

@@ -1,3 +1,17 @@
+0.2.11 2011-03-27  "High Definition"
+
+	* More prominent display of track status.
+
+	* Show number of laps remaining during the race.
+
+	* Added display of Fastest Lap information during the race.
+
+	* Added display of Weather information.
+
+	* Automatic recovery from authentication and decryption failures.
+
+	* Added a man page.
+
 0.2.10 2010-05-11
 
 	* New Maintainer: Dave Pusey <dave@puseyuk.co.uk>
