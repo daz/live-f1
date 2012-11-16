@@ -3,8 +3,8 @@
 localedir = $(datadir)/locale
 AM_CPPFLAGS = \
 	-DLOCALEDIR="\"$(localedir)\"" -I$(top_srcdir)/intl \
-	$(NEON_CFLAGS)
-LDADD = $(NEON_LIBS)
+	$(LIBEVENT_CFLAGS)
+LDADD = $(LIBEVENT_LIBS)
 
 
 bin_PROGRAMS = \
@@ -17,7 +17,9 @@ live_f1_SOURCES = \
 	display.c display.h \
 	http.c http.h \
 	packet.c packet.h \
-	stream.c stream.h
+	stream.c stream.h \
+	packetcache.c packetcache.h \
+	packetdef.h
 
 
 clean-local:

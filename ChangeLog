@@ -1,3 +1,12 @@
+2012-11-16  Yuriy Mishkov  <ymishkov@gmail.com>
+
+	* Added save/replay timing functionality and delay feature.
+
+	* Added screen moving feature, changed information messages
+	  visualization.
+
+	* Switched from neon to libevent for asynchronous notifications.
+
 2011-03-27  Dave Pusey  <dave@puseyuk.co.uk>
 
 	* NEWS: Release 0.2.11

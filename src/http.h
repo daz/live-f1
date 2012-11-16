@@ -25,12 +25,10 @@
 
 SJR_BEGIN_EXTERN
 
-char *       obtain_auth_cookie    (const char *host,
-				    const char *email, const char *password);
-unsigned int obtain_decryption_key (const char *host, unsigned int event_no,
-				    const char *cookie);
-int          obtain_key_frame      (const char *host, unsigned int frame,
-				    void *unknown);
+void start_get_auth_cookie    (StateReader *r);
+void start_get_decryption_key (StateReader *r);
+void start_get_key_frame      (StateReader *r);
+void start_get_total_laps     (StateReader *r);
 
 SJR_END_EXTERN
 

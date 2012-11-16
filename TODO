@@ -27,8 +27,7 @@ High Priority:
 Wishlists:
 
  * Record/playback functionality for events that your TV provider
-   doesn't transmit live -- pause, fast forward and rewind within the
-   client too.  (Live Pause? :p)
+   doesn't transmit live -- rewind within the client.
 
  * Do SOMETHING with the weather data, and position history data, just
    displaying the current values isn't interesting; it's the trends
@@ -42,3 +41,7 @@ Wishlists:
  * Find somewhere to put the commentary.
 
  * GTK+ ui?
+
+ * Client-retranslation server mode; retranslation server should reveive
+   live timing stream and retranslate it to connected clients with
+   various delays.

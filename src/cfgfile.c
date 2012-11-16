@@ -48,10 +48,10 @@ static char *fgets_alloc (FILE *stream);
 
 /**
  * read_config:
- * @state: application state structure,
+ * @state: application state structure.
  * @filename: configuration file to read from.
  *
- * Read configuration values from @filename and store them in @state.
+ * Reads configuration values from @filename and stores them in @state.
  *
  * Returns: 0 on success, non-zero on failure.
  **/
@@ -92,17 +92,17 @@ read_config (CurrentState *state,
 		ptr += strspn (ptr, " \t\r\n");
 
 		if (! strcmp (line, "email")) {
-			free (state->email);
-			state->email = strdup (ptr);
+			free (state->r.email);
+			state->r.email = strdup (ptr);
 		} else if (! strcmp (line, "password")) {
-			free (state->password);
-			state->password = strdup (ptr);
+			free (state->r.password);
+			state->r.password = strdup (ptr);
 		} else if (! strcmp (line, "host")) {
-			free (state->host);
-			state->host = strdup (ptr);
+			free (state->r.host);
+			state->r.host = strdup (ptr);
 		} else if (! strcmp (line, "auth-host")) {
-			free (state->auth_host);
-			state->auth_host = strdup (ptr);
+			free (state->r.auth_host);
+			state->r.auth_host = strdup (ptr);
 		} else {
 			fprintf (stderr, "%s:%s:%d: %s: %s\n", program_name,
 				 filename, lineno, line,
@@ -168,10 +168,10 @@ fgets_alloc (FILE *stream)
 
 /**
  * write_config:
- * @state: application state structure,
+ * @state: application state structure.
  * @filename: configuration file to read from.
  *
- * Write configuration values to @filename from @state.
+ * Writes configuration values to @filename from @state.
  *
  * Returns: 0 on success, non-zero on failure.
  **/
@@ -206,8 +206,8 @@ write_config (CurrentState *state,
 		fprintf (stderr, "%s:%s: %s\n", program_name, tmpfile,
 			 _("couldn't change file permissions"));
 
-	fprintf (cfgf, "email %s\n", state->email);
-	fprintf (cfgf, "password %s\n", state->password);
+	fprintf (cfgf, "email %s\n", state->r.email);
+	fprintf (cfgf, "password %s\n", state->r.password);
 
 	if (fclose (cfgf)) {
 		fprintf (stderr, "%s:%s: %s\n", program_name, tmpfile,
@@ -231,7 +231,7 @@ write_config (CurrentState *state,
  * get_config:
  * @state: application state structure.
  *
- * Get the configuration values by prompting the user and fill @state
+ * Gets the configuration values by prompting the user and fills @state
  * with them.
  *
  * Returns: 0 on success, non-zero on failure.
@@ -251,8 +251,8 @@ get_config (CurrentState *state)
 	printf (_("Enter your registered e-mail address: "));
 	answer = fgets_alloc (stdin);
 	if (answer) {
-		free (state->email);
-		state->email = strdup (answer);
+		free (state->r.email);
+		state->r.email = strdup (answer);
 	} else {
 		return 1;
 	}
@@ -285,8 +285,8 @@ get_config (CurrentState *state)
 	}
 
 	if (answer) {
-		free (state->password);
-		state->password = strdup (answer);
+		free (state->r.password);
+		state->r.password = strdup (answer);
 	} else {
 		return 1;
 	}

@@ -31,7 +31,7 @@
 #include <regex.h>
 
 #include "live-f1.h"
-#include "packet.h" /* for packet type */
+#include "packet.h"
 #include "display.h"
 
 
@@ -57,15 +57,27 @@ typedef enum {
 
 
 /* Forward prototypes */
-static void _update_cell (CurrentState *state, int car, int type);
-static void _update_time (CurrentState *state);
+static void _update_cell   (StateModel *m, int car, int type);
+static void _update_car    (StateModel *m, int car);
+static void _update_status (StateModel *m);
+static void _update_time   (StateModel *m);
+static void _update_info   ();
 
 
 /* Curses display running */
 int cursed = 0;
 
-/* Number of lines being used for the board */
+/* Number of lines being used for the board and status */
 static int nlines = 0;
+
+/* Number of columns being used for the board */
+static int ncols = 69;
+
+/* x- and y-coordinates of board point placed in
+ * the top-left corner of the screen
+ */
+static int startx = 0;
+static int starty = 0;
 
 /* Attributes for the colours */
 static int attrs[LAST_COLOUR];
@@ -73,16 +85,24 @@ static int attrs[LAST_COLOUR];
 /* Various windows */
 static WINDOW *boardwin = NULL;
 static WINDOW *statwin = NULL;
-static WINDOW *popupwin = NULL;
+static WINDOW *infowin = NULL;
 
+/* Size of info_ring */
+#define DISPLAY_INFO_RING_BUFFER_SIZE 32
+static const size_t info_ring_size = DISPLAY_INFO_RING_BUFFER_SIZE;
+/* Max length of message in info_ring */
+static const size_t info_msg_width = 80;
+/* Ring buffer for info messages */
+static char *info_ring[DISPLAY_INFO_RING_BUFFER_SIZE];
+/* Index of most recent message in info_ring */
+static size_t info_head = DISPLAY_INFO_RING_BUFFER_SIZE - 1;
 
 /**
  * open_display:
- * @state: application state structure.
  *
  * Opens the curses display to display timing information.
  **/
-void
+static void
 open_display (void)
 {
 	if (cursed)
@@ -147,112 +167,156 @@ open_display (void)
 }
 
 /**
- * clear_board;
- * @state: application state structure.
+ * outrefresh_window:
+ * @win: window to refresh.
  *
- * Clear an area on the screen for the timing board and put the headers
- * in.  Updates display when done.
+ * Refreshes @win (wnoutrefresh/pnoutrefresh).
+ * Doesn't call doupdate.
  **/
-void
-clear_board (CurrentState *state)
+static void
+outrefresh_window (WINDOW *win)
 {
-	int i, j;
+	int vcols = MIN (ncols, COLS - 11);
+	int vlines = MIN (nlines - starty + 1, LINES);
 
-	open_display ();
-	close_popup ();
+	if (! win)
+		return;
+	if (win == stdscr)
+		wnoutrefresh (win);
+	if (win == boardwin)
+		pnoutrefresh (win,     starty,     startx,
+		                            0,          0,
+				   vlines - 1,  vcols - 1);
+	if (win == statwin)
+		pnoutrefresh (win,     starty,          0,
+		                            0,  vcols + 1,
+				   vlines - 1, vcols + 10);
+	if (win == infowin) {
+		int istarty = MAX (info_ring_size - (LINES - vlines), 0);
 
-	if (boardwin)
-		delwin (boardwin);
-
-	nlines = MAX (state->num_cars, 21);
-	for (i = 0; i < state->num_cars; i++)
-		nlines = MAX (nlines, state->car_position[i]);
-
-	nlines += 3;
-
-	if (LINES < nlines) {
-		close_display ();
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("insufficient lines on display"));
-		exit (10);
-	}
-	if (COLS < 69) {
-		close_display ();
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("insufficient columns on display"));
-		exit (10);
-	}
-
-	boardwin = newwin (nlines, 69, 0, 0);
-	wbkgdset (boardwin, attrs[COLOUR_DATA]);
-	werase (boardwin);
-
-		switch (state->event_type) {
-		case RACE_EVENT:
-			mvwprintw (boardwin, 0, 0,
-				   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
-				   _("P"), _(""), _("Name"), _("Gap"), _("Int"),
-				   _("Time"), _("Sector 1"), _("Sector 2"),
-				   _("Sector 3"), _("Ps"));
-			break;
-		case PRACTICE_EVENT:
-			mvwprintw (boardwin, 0, 0,
-				   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
-				   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
-				   _("Sec 1"), _("Sec 2"), _("Sec 3"), _(" Lap"));
-			break;
-		case QUALIFYING_EVENT:
-			mvwprintw (boardwin, 0, 0,
-				   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
-				   _("P"), _(""), _("Name"), _("Period 1"),
-				   _("Period 2"), _("Period 3"), _("Sec 1"),
-				   _("Sec 2"), _("Sec 3"), _("Lp"));
-			break;
-		}
-
-	for (i = 1; i <= state->num_cars; i++) {
-		for (j = 0; j < LAST_CAR_PACKET; j++)
-			_update_cell (state, i, j);
-	}
-
-	wnoutrefresh (boardwin);
-	doupdate ();
-
-	if (statwin) {
-		delwin (statwin);
-		statwin = NULL;
-
-		update_status (state);
+		pnoutrefresh (win,    istarty,     startx,
+		                       vlines,          0,
+				    LINES - 1,   COLS - 1);
 	}
 }
 
 /**
+ * outrefresh_windows:
+ *
+ * Refreshes all windows except stdscr.
+ **/
+static void
+outrefresh_windows ()
+{
+	outrefresh_window (boardwin);
+	outrefresh_window (statwin);
+	outrefresh_window (infowin);
+}
+
+/**
+ * outrefresh_all:
+ *
+ * Invalidates stdscr and refreshes all windows.
+ **/
+static void
+outrefresh_all ()
+{
+	touchwin (stdscr);
+	outrefresh_window (stdscr);
+	outrefresh_windows ();
+}
+
+/**
+ * clear_board:
+ * @m: model structure.
+ *
+ * Clears an area on the screen for the timing board and put the headers in.
+ * Also updates info window and clears and updates status window.
+ * Updates display when done.
+ **/
+void
+clear_board (StateModel *m)
+{
+	int i, j;
+
+	open_display ();
+
+	if (boardwin)
+		delwin (boardwin);
+
+	nlines = MAX (m->num_cars, 21);
+	for (i = 0; i < m->num_cars; i++)
+		nlines = MAX (nlines, m->car_position[i]);
+	nlines += 3;
+
+	boardwin = newpad (nlines + 1, ncols + 1);
+	wbkgdset (boardwin, attrs[COLOUR_DATA]);
+	werase (boardwin);
+
+	switch (m->event_type) {
+	case RACE_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %4s %4s %-8s %-8s %-8s %-8s %2s",
+			   _("P"), _(""), _("Name"), _("Gap"), _("Int"),
+			   _("Time"), _("Sector 1"), _("Sector 2"),
+			   _("Sector 3"), _("Ps"));
+		break;
+	case PRACTICE_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %-8s %6s %5s %5s %5s %-4s",
+			   _("P"), _(""), _("Name"), _("Best"), _("Gap"),
+			   _("Sec 1"), _("Sec 2"), _("Sec 3"), _(" Lap"));
+		break;
+	case QUALIFYING_EVENT:
+		mvwprintw (boardwin, 0, 0,
+			   "%2s %2s %-14s %-8s %-8s %-8s %5s %5s %5s %-2s",
+			   _("P"), _(""), _("Name"), _("Period 1"),
+			   _("Period 2"), _("Period 3"), _("Sec 1"),
+			   _("Sec 2"), _("Sec 3"), _("Lp"));
+		break;
+	}
+
+	for (i = 1; i <= m->num_cars; i++)
+		_update_car (m, i);
+
+	if (statwin) {
+		delwin (statwin);
+		statwin = NULL;
+	}
+	_update_status (m);
+	_update_info ();
+
+	outrefresh_all ();
+
+	doupdate ();
+}
+
+/**
  * _update_cell:
- * @state: application state structure,
- * @car: car number to update,
+ * @m: model structure.
+ * @car: car number to update.
  * @type: atom to update.
  *
- * Update a particular cell on the board, with the necessary information
- * available in the state structure.  For internal use, does not refresh
+ * Updates a particular cell on the board, with the necessary information
+ * available in the model structure. For internal use, does not refresh
  * or update the screen.
  **/
 static void
-_update_cell (CurrentState *state,
-	      int           car,
-	      int           type)
+_update_cell (StateModel *m,
+	      int         car,
+	      int         type)
 {
 	int         y, x, sz, align, attr;
-	CarAtom    *atom;
 	const char *text;
 	size_t      len, pad;
 
-	y = state->car_position[car - 1];
+	y = m->car_position[car - 1];
 	if (! y)
 		return;
 	if (nlines < y)
-		clear_board (state);
+		clear_board (m);
 
-	switch (state->event_type) {
+	switch (m->event_type) {
 	case RACE_EVENT:
 		switch ((RaceAtomType) type) {
 		case RACE_POSITION:
@@ -435,10 +499,16 @@ _update_cell (CurrentState *state,
 		return;
 	}
 
-	atom = &state->car_info[car - 1][type];
-	attr = attrs[atom->data];
-	text = atom->text;
-	len = strlen ((const char *) text);
+	if (m->car_info[car - 1]) {
+		CarAtom *atom = &m->car_info[car - 1][type];
+
+		attr = attrs[atom->data];
+		text = atom->text;
+		len = strlen ((const char *) text);
+	} else {
+		text = "";
+		len = 0;
+	}
 
 	/* Check for over-long atoms */
 	if (len > sz) {
@@ -463,126 +533,131 @@ _update_cell (CurrentState *state,
 
 /**
  * update_cell:
- * @state: application state structure,
- * @car: car number to update,
+ * @m: model structure.
+ * @car: car number to update.
  * @type: atom to update.
  *
- * Update a particular cell on the board, with the necessary information
- * available in the state structure.  Intended for external code as it
+ * Updates a particular cell on the board, with the necessary information
+ * available in the model structure. Intended for external code as it
  * updates the display when done.
  **/
 void
-update_cell (CurrentState *state,
-	     int           car,
-	     int           type)
+update_cell (StateModel *m,
+	     int         car,
+	     int         type)
 {
 	if (! cursed)
-		clear_board (state);
-	close_popup ();
+		clear_board (m);
 
-	_update_cell (state, car, type);
+	_update_cell (m, car, type);
 
-	_update_time (state);
- 	wnoutrefresh (boardwin);
+	outrefresh_window (boardwin);
+
 	doupdate ();
 }
 
 /**
+ * _update_car:
+ * @m: model structure.
+ * @car: car number to update.
+ *
+ * Updates the entire row for the given car. For internal use,
+ * does not refresh or update the screen.
+ **/
+static void
+_update_car (StateModel *m,
+             int         car)
+{
+	int i;
+
+	for (i = 0; i < LAST_CAR_PACKET; i++)
+		_update_cell (m, car, i);
+}
+
+/**
  * update_car:
- * @state: application state structure,
+ * @m: model structure.
  * @car: car number to update.
  *
  * Update the entire row for the given car, and the display when done.
  **/
 void
-update_car (CurrentState *state,
-	    int           car)
+update_car (StateModel *m,
+	    int         car)
 {
-	int i;
-
 	if (! cursed)
-		clear_board (state);
-	close_popup ();
+		clear_board (m);
 
-	for (i = 0; i < LAST_CAR_PACKET; i++)
-		_update_cell (state, car, i);
+	_update_car (m, car);
 
-	_update_time (state);
- 	wnoutrefresh (boardwin);
+	outrefresh_window (boardwin);
+
 	doupdate ();
 }
 
 /**
  * clear_car:
- * @state: application state structure,
+ * @m: model structure.
  * @car: car number to update.
  *
- * Clear the car from the board, updating the display when done.
+ * Clears the car from the board, updating the display when done.
  **/
 void
-clear_car (CurrentState *state,
-	   int           car)
+clear_car (StateModel *m,
+	   int         car)
 {
 	int y;
 
 	if (! cursed)
-		clear_board (state);
+		clear_board (m);
 
-	y = state->car_position[car - 1];
+	y = m->car_position[car - 1];
 	if (! y)
 		return;
 	if (nlines < y)
-		clear_board (state);
-
-	close_popup ();
+		clear_board (m);
 
 	wmove (boardwin, y, 0);
 	wclrtoeol (boardwin);
 
-	_update_time (state);
-	wnoutrefresh (boardwin);
+	outrefresh_window (boardwin);
+
 	doupdate ();
 }
 
 /**
  * draw_bar:
- * @win: the window into which to draw
- * @len: the length of the bar to draw
+ * @win: the window into which to draw.
+ * @len: the length of the bar to draw.
  *
  * Draws a solid bar of a specified length, at the current cursor
  * position in the specified window.
  **/
-void
+static void
 draw_bar (WINDOW *win, int len)
 {
 	int i;
 
 	for (i = 0; i < len; i++)
-	{
 		waddch (win, ' ');
-	}
 }
 
 /**
- * update_status:
- * @state: application state structure,
+ * _update_status:
+ * @m: model structure.
  *
- * Update the status window, creating it if necessary.  Updates the
- * display when done.
+ * Updates the status window, creating it if necessary. For internal use,
+ * does not refresh or update the screen.
  **/
-void
-update_status (CurrentState *state)
+static void
+_update_status (StateModel *m)
 {
 	if (! cursed)
-		clear_board (state);
-	close_popup ();
+		clear_board (m);
 
 	/* Put the window down the side if we have enough room */
 	if (! statwin) {
-		if (COLS < 80)
-			return;
-
-		statwin = newwin (nlines, 10, 0, COLS - 10);
+		statwin = newpad (nlines + 1, 11);
 		wbkgdset (statwin, attrs[COLOUR_DATA]);
 		werase (statwin);
 	}
@@ -591,7 +666,7 @@ update_status (CurrentState *state)
 
 	wmove (statwin, 2, 0);
 	wclrtoeol (statwin);
-	switch (state->flag) {
+	switch (m->flag) {
 	case YELLOW_FLAG:
 	case SAFETY_CAR_STANDBY:
 	case SAFETY_CAR_DEPLOYED:
@@ -605,7 +680,7 @@ update_status (CurrentState *state)
 	}
 	wmove (statwin, 3, 0);
 	wclrtoeol (statwin);
-	switch (state->flag) {
+	switch (m->flag) {
 	case SAFETY_CAR_DEPLOYED:
 		wattrset (statwin, attrs[COLOUR_OLD]);
 		waddstr (statwin, "SAFETY CAR");
@@ -617,9 +692,9 @@ update_status (CurrentState *state)
 	wattrset (statwin, attrs[COLOUR_DATA]);
 	wmove (statwin, 0, 0);
 	wclrtoeol (statwin);
-	switch (state->event_type) {
+	switch (m->event_type) {
 	case RACE_EVENT:
-		switch (state->total_laps - state->laps_completed) {
+		switch (m->total_laps - m->laps_completed) {
 		case 0:
 			wprintw (statwin, "%10s", "FINISHED");
 			break;
@@ -627,7 +702,7 @@ update_status (CurrentState *state)
 			wprintw (statwin, "%10s", "FINAL LAP");
 			break;
 		default:
-			wprintw (statwin, "%4d TO GO", state->total_laps - state->laps_completed);
+			wprintw (statwin, "%4d TO GO", m->total_laps - m->laps_completed);
 			break;
 		}
 		break;
@@ -646,7 +721,7 @@ update_status (CurrentState *state)
  
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw(statwin,"%-6s%2d C", "Track", state->track_temp);
+	wprintw(statwin,"%-6s%2d C", "Track", m->track_temp);
 	wmove (statwin, wline, 8);
 	waddch (statwin, ACS_DEGREE);
 
@@ -654,7 +729,7 @@ update_status (CurrentState *state)
 
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw(statwin,"%-6s%2d C", "Air", state->air_temp);
+	wprintw(statwin,"%-6s%2d C", "Air", m->air_temp);
 	wmove (statwin, wline, 8);
 	waddch (statwin, ACS_DEGREE);
 
@@ -662,12 +737,12 @@ update_status (CurrentState *state)
 
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw (statwin, "%-6s%3d", "Wind", state->wind_direction);
+	wprintw (statwin, "%-6s%3d", "Wind", m->wind_direction);
 	waddch (statwin, ACS_DEGREE);
 	wline++;
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw (statwin, "%-4s%03dm/s", "", state->wind_speed);
+	wprintw (statwin, "%-4s%03dm/s", "", m->wind_speed);
 	wmove (statwin, wline, 5);
 	waddch (statwin, '.');
 
@@ -679,7 +754,7 @@ update_status (CurrentState *state)
 	wline++;
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw (statwin, "%-6s%3d%%", "", state->humidity);
+	wprintw (statwin, "%-6s%3d%%", "", m->humidity);
 
 	wline += 2;
 
@@ -689,39 +764,48 @@ update_status (CurrentState *state)
 	wline++;
 	wmove (statwin, wline, 0);
 	wclrtoeol (statwin);
-	wprintw(statwin, "%-2s%6dmb", "", state->pressure);
+	wprintw(statwin, "%-2s%6dmb", "", m->pressure);
 	wmove (statwin, wline, 6);
 	waddch (statwin, '.');
 
 	/* Update fastest lap line (race only) */
 
-	if (state->event_type == RACE_EVENT)
-	{
+	if (m->event_type == RACE_EVENT) {
 		wmove (boardwin, nlines - 1, 3);
 		wattrset (boardwin, attrs[COLOUR_RECORD]);
 		wclrtoeol (boardwin);
-		wprintw(boardwin, "%2s %-14s %4s %4s %8s", state->fl_car, state->fl_driver, "LAP", state->fl_lap, state->fl_time);
+		wprintw(boardwin, "%2s %-14s %4s %4s %8s", m->fl_car, m->fl_driver, "LAP", m->fl_lap, m->fl_time);
 	}
 
 	/* Update session clock */
 	
-	_update_time (state);
+	_update_time (m);
+}
 
-	/* Refresh display */
-
-	wnoutrefresh (statwin);
-	wnoutrefresh (boardwin);
+/**
+ * update_status:
+ * @m: model structure.
+ *
+ * Updates the status window, creating it if necessary. Updates the
+ * display when done.
+ **/
+void
+update_status (StateModel *m)
+{
+	_update_status (m);
+	outrefresh_window (statwin);
+	outrefresh_window (boardwin);
 	doupdate ();
 }
 
 /**
  * _update_time:
- * @state: application state structure.
+ * @m: model structure.
  *
  * Updates the time in the status window without redrawing the display.
  **/
 static void
-_update_time (CurrentState *state)
+_update_time (StateModel *m)
 {
 	time_t remaining;
 
@@ -731,48 +815,41 @@ _update_time (CurrentState *state)
 	wmove (statwin, nlines - 1, 2);
 	wattrset (statwin, attrs[COLOUR_DATA]);
 
-	// Pause the clock during a red flag, but only for Qualifying and the Race.
-	if ((state->flag == RED_FLAG) && (state->event_type != PRACTICE_EVENT))
-	{
-		remaining = state->remaining_time;
-	} else if (state->epoch_time) {
-		remaining = MAX ((state->epoch_time + state->remaining_time) - time (NULL), 0);
-	} else {
-		remaining = state->remaining_time;
-	}
+	/* Pause the clock during a red flag,
+	 * but only for Qualifying and the Race.
+	 */
+	if ((m->flag == RED_FLAG) && (m->event_type != PRACTICE_EVENT))
+		remaining = m->remaining_time;
+	else if (m->model_time && m->remaining_time && m->epoch_time) {
+		time_t maxtime = MAX (m->epoch_time + m->remaining_time, m->model_time);
 
-	if (remaining >= 3600) {
-		wprintw (statwin, "%d:", remaining / 3600);
-		remaining %= 3600;
-		wprintw (statwin, "%02d:", remaining / 60);
-		remaining %= 60;
-		wprintw (statwin, "%02d", remaining);
-	} else if (remaining >= 60) {
-		wprintw (statwin, "0:%02d:", remaining / 60);
-		remaining %= 60;
-		wprintw (statwin, "%02d", remaining);
-	} else {
-		wprintw (statwin, "0:00:%02d", remaining);
-	}
+		remaining = maxtime - m->model_time;
+	} else
+		remaining = m->remaining_time;
 
-	wnoutrefresh (statwin);
+	remaining %= 86400;
+	wprintw (statwin, "%d:", remaining / 3600);
+	remaining %= 3600;
+	wprintw (statwin, "%02d:", remaining / 60);
+	remaining %= 60;
+	wprintw (statwin, "%02d", remaining);
 }
 
 /**
  * update_time:
- * @state: application state structure.
+ * @m: model structure.
  *
  * External function to update the time, unlike most display functions this
- * one doesn't clear an open popup as it's not possible for them to ever
- * cover the time.  It also doesn't open the display if not already done.
+ * one doesn't open the display if not already done.
  **/
 void
-update_time (CurrentState *state)
+update_time (StateModel *m)
 {
 	if ((! cursed) || (! statwin))
 		return;
 
-	_update_time (state);
+	_update_time (m);
+	outrefresh_window (statwin);
 
 	doupdate ();
 }
@@ -780,19 +857,27 @@ update_time (CurrentState *state)
 /**
  * close_display:
  *
- * Waits for the user to press a key, then closes the curses display
- * and returns to normality.
+ * Closes the curses display and returns to normality.
  **/
 void
 close_display (void)
 {
+	size_t i;
+
+	for (i = 0; i < info_ring_size; ++i) {
+		free (info_ring[i]);
+		info_ring[i] = NULL;
+	}
+
 	if (! cursed)
 		return;
 
-	if (popupwin)
-		delwin (popupwin);
 	if (boardwin)
 		delwin (boardwin);
+	if (statwin)
+		delwin (statwin);
+	if (infowin)
+		delwin (infowin);
 
 	endwin ();
 
@@ -801,7 +886,7 @@ close_display (void)
 
 /**
  * handle_keys:
- * @state: application state structure.
+ * @m: model structure.
  *
  * Checks for a key press on the keyboard and handles it; this includes
  * keys that should quit the app (Enter, Escape, q, etc.) and pseudo-keys
@@ -810,7 +895,7 @@ close_display (void)
  * Returns: 0 if none were pressed, 1 if one was, -1 if should quit.
  **/
 int
-handle_keys (CurrentState *state)
+handle_keys (StateModel *m)
 {
 	if (! cursed)
 		return 0;
@@ -824,7 +909,67 @@ handle_keys (CurrentState *state)
 	case 'Q':
 		return -1;
 	case KEY_RESIZE:
-		clear_board (state);
+		outrefresh_all ();
+		doupdate ();
+		return 1;
+	case KEY_LEFT:
+		if (startx > 0) {
+			--startx;
+			outrefresh_window (boardwin);
+			outrefresh_window (infowin);
+			doupdate ();
+		}
+		return 1;
+	case KEY_RIGHT:
+		if (startx + 1 < ncols) {
+			++startx;
+			outrefresh_window (boardwin);
+			outrefresh_window (infowin);
+			doupdate ();
+		}
+		return 1;
+	case KEY_UP:
+		if (starty > 0) {
+			--starty;
+			outrefresh_all ();
+			doupdate ();
+		}
+		return 1;
+	case KEY_DOWN:
+		if (starty + 1 < nlines) {
+			++starty;
+			outrefresh_all ();
+			doupdate ();
+		}
+		return 1;
+	case 'i':
+	case 'I':
+		++m->time_gap;
+		return 1;
+	case 'k':
+	case 'K':
+		if (m->time_gap + m->replay_gap >= 1)
+			--m->time_gap;
+		return 1;
+	case 'u':
+	case 'U':
+		m->time_gap += 60;
+		return 1;
+	case 'j':
+	case 'J':
+		if (m->time_gap + m->replay_gap >= 60)
+			m->time_gap -= 60;
+		return 1;
+	case '0':
+		if (m->time_gap) {
+			m->last_time_gap = m->time_gap;
+			m->time_gap = 0;
+		} else
+			m->time_gap = m->last_time_gap;
+		return 1;
+	case 'p':
+	case 'P':
+		m->paused = ! m->paused;
 		return 1;
 	default:
 		return 0;
@@ -832,131 +977,149 @@ handle_keys (CurrentState *state)
 }
 
 /**
- * popup_message:
+ * new_info_line:
+ * @with_time: true if time header required.
+ * @spaces: blank spaces at the beginning of a line.
+ *
+ * Adds new string of info_msg_width length to info_ring and write time
+ * (@with_time == true) or @spaces at the beginning of it.
+ *
+ * Returns: header symbols count or -1 on failure.
+ **/
+static int
+new_info_line (int with_time, int spaces)
+{
+	info_head = (info_head + 1) % info_ring_size;
+	if (! info_ring[info_head]) {
+		info_ring[info_head] = malloc (info_msg_width + 1);
+		if (! info_ring[info_head])
+			return -1;
+	}
+	memset (info_ring[info_head], 0, info_msg_width + 1);
+	if (with_time) {
+		time_t ct = time (NULL) % 86400;
+		int    h, m, s;
+
+		if (ct < 0)
+			ct += 86400;
+		h = ct / 3600;
+		m = (ct % 3600) / 60;
+		s = ct % 60;
+		return snprintf (info_ring[info_head], info_msg_width + 1,
+		                 "%02d:%02d:%02d ", h, m, s);
+	} else {
+		int res = MIN (spaces, info_msg_width);
+
+		memset (info_ring[info_head], ' ', res);
+		return res;
+	}
+}
+
+/**
+ * split_message:
+ * @message: message to split.
+ *
+ * Splits long message by words and adds it to info_ring.
+ * Also replaces whitespaces with ordinary spaces.
+ **/
+static void
+split_message (const char *message)
+{
+	const size_t  len = strlen (message);
+	int           col, ls, i;
+	const int     spaces = new_info_line (1, 0);
+	char         *msg = info_ring[info_head];
+
+	col = spaces;
+	if ((col < 0) || (col >= info_msg_width))
+		return;
+	ls = -1;
+	for (i = 0; i < len; i++) {
+		msg[col] = message[i];
+		if (strchr (" \t\r\n", message[i])) {
+			msg[col] =  ' ';
+			ls = i;
+		}
+		++col;
+		if ((message[i] == '\n') || (col >= info_msg_width)) {
+			if (ls > 0) {
+				col -= i + 1 - ls;
+				i = ls;
+			}
+			msg[col] = 0;
+			col = new_info_line (0, spaces);
+			if ((col < 0) || (col >= info_msg_width))
+				return;
+			msg = info_ring[info_head];
+			ls = -1;
+		}
+	}
+	msg[col] = 0;
+}
+
+/**
+ * _update_info:
+ *
+ * Updates the info window, creating it if necessary. For internal use,
+ * does not refresh or update the screen.
+ **/
+static void
+_update_info ()
+{
+	size_t i, line;
+
+	if (! infowin) {
+		infowin = newpad (info_ring_size + 1, info_msg_width + 1);
+		wbkgdset (infowin, attrs[COLOUR_POPUP]);
+		werase (infowin);
+	}
+
+	i = (info_head + 1) % info_ring_size;
+	for (line = 0; line < info_ring_size; i = (i + 1) % info_ring_size, ++line) {
+		wmove (infowin, line, 0);
+		wclrtoeol (infowin);
+		if (! info_ring[i])
+			continue;
+		wmove (infowin, line, 0);
+		waddnstr (infowin, info_ring[i], info_msg_width);
+	}
+
+}
+
+/**
+ * info_message:
  * @message: message to display.
  *
- * Displays a popup message over top of the screen, calling doupdate() when
- * done.  This can be dismisssed by calling close_popup().
+ * Adds @message to info_ring and displays it on the screen.
  **/
 void
-popup_message (const char *message)
+info_message (const char *message)
 {
 	char  *msg;
 	size_t msglen;
-	int    nlines, ncols, col, ls, i;
 	regex_t re;
-
-	open_display ();
-	close_popup ();
 
 	regcomp(&re, "^img:", REG_EXTENDED|REG_NOSUB);
 
 	if (regexec(&re, message, (size_t)0, NULL, 0) == 0)
-	{
 		msg = strdup ("CURRENTLY NO LIVE SESSION");
-	} else {
+	else
 		msg = strdup (message);
-	}
 	regfree (&re);
 
 	msglen = strlen (msg);
 	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
 		msg[--msglen] = 0;
-
-	if (! msglen) {
-		free (msg);
-		return;
-	}
-
-	/* Calculate the popup size needed for the message.
-	 * Also replaces whitespace with ordinary spaces or newlines.
-	 */
-	nlines = 1;
-	ncols = col = ls = 0;
-	for (i = 0; i < msglen; i++) {
-		if (strchr (" \t\r", msg[i])) {
-			msg[i] =  ' ';
-			ls = i;
-		} else if (msg[i] == '\n') {
-			ncols = MAX (ncols, col);
-
-			nlines++;
-			col = ls = 0;
-			continue;
-		}
-
-		if (++col > 58) {
-			if (ls) {
-				col -= i - ls + 1;
-				i = ls;
-				msg[i] = '\n';
-
-				ncols = MAX (ncols, col);
-			} else {
-				ncols = MAX (ncols, 58);
-				i--;
-			}
-
-			nlines++;
-			col = ls = 0;
-		}
-	}
-	ncols = MAX (ncols, col);
-
-	/* Create the popup window in the middle of the screen */
-	popupwin = newwin (nlines + 2, ncols + 2,
-			   (LINES - (nlines + 2)) / 2,
-			   (COLS - (ncols + 2)) / 2);
-	wbkgdset (popupwin, attrs[COLOUR_POPUP]);
-	werase (popupwin);
-	box (popupwin, 0, 0);
-
-	/* Now draw the characters into it */
-	nlines = col = 0;
-	for (i = 0; i < msglen; i++) {
-		if (msg[i] == '\n') {
-			nlines++;
-			col = 0;
-			continue;
-		} else if (++col > 58) {
-			nlines++;
-			col = 1;
-		}
-
-		mvwaddch (popupwin, nlines + 1, col, msg[i]);
-	}
-
-	wnoutrefresh (popupwin);
-	doupdate ();
+	if (msglen)
+		split_message (msg);
 
 	free (msg);
-}
 
-/**
- * close_popup:
- *
- * Close the popup window and schedule all other windows on the screen
- * to be redrawn when the next doupdate() is called.
- **/
-void
-close_popup (void)
-{
-	if ((! cursed) || (! popupwin))
+	if ((! msglen) || (! cursed))
 		return;
 
-	delwin (popupwin);
-	popupwin = NULL;
+	_update_info ();
 
-	redrawwin (stdscr);
-	wnoutrefresh (stdscr);
-
-	if (boardwin) {
-		redrawwin (boardwin);
-		wnoutrefresh (boardwin);
-	}
-
-	if (statwin) {
-		redrawwin (statwin);
-		wnoutrefresh (statwin);
-	}
+	outrefresh_window (infowin);
+	doupdate ();
 }

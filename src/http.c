@@ -26,10 +26,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <ne_request.h>
-#include <ne_uri.h>
+#include <event2/http.h>
 
 #include "live-f1.h"
+#include "packet.h"
 #include "stream.h"
 #include "http.h"
 
@@ -41,17 +41,39 @@
 #define KEYFRAME_URL_PREFIX "/keyframe"
 
 
+//TODO: description
+typedef struct {
+	StateReader              *r;
+	struct evhttp_connection *conn;
+	struct evhttp_request    *req;
+	void                     *userdata;
+} StateRequest;
+
+//TODO: description
+typedef struct {
+	StateReader     *r;
+	struct evbuffer *response;
+	void            *userdata;
+} StateRequestResult;
+
+//TODO: description
+typedef struct {
+	unsigned int no;
+	EventType    type;
+} EventNumTypePair;
+
+
 /* Forward prototypes */
 static void parse_cookie_hdr (char **value, const char  *header);
-static int  parse_key_body   (unsigned int *key, const char *buf, size_t len);
-static int  parse_number_body();
+static void parse_hex_number (unsigned int *num, const char *buf, size_t len);
+static void parse_dec_number (unsigned int *num, const char *buf, size_t len);
 
 
 /**
  * numlen:
  * @number: number to calculate length of.
  *
- * Returns: the number of digits in number.
+ * Returns: the number of decimal digits in @number.
  **/
 static inline size_t
 numlen (unsigned int number)
@@ -64,98 +86,243 @@ numlen (unsigned int number)
 	return len;
 }
 
+/**
+ * is_valid_http_response_code:
+ * @code: HTTP response code.
+ *
+ * Returns: non-zero if non-error HTTP response.
+ **/
+static int
+is_valid_http_response_code (int code)
+{
+	return code < 400;
+}
 
 /**
- * obtain_auth_cookie:
- * @host: host to obtain cookie from,
- * @email: e-mail address registered with the F1 website,
- * @password: paassword registered for @email.
+ * get_host_and_port:
+ * @hostname[in]: source URI.
+ * @fullname[out]: pointer to save host part of @hostname (may be NULL).
+ * @port[out]: pointer to save port of @hostname (may be NULL).
  *
- * Obtains the user's authentication cookie from the Live Timing website
- * by logging in with their e-mail address and password and stealing out
- * of the response headers.
+ * Parses @hostname.
+ * Adds http:// prefix to host name if @hostname hasn't it.
+ * Writes default HTTP port (80) to @port if @hostname has no port part.
+ *
+ * Returns: 0 on success, -1 otherwise.
+ **/
+static int
+get_host_and_port (const char *hostname, char **fullname, int *port)
+{
+	struct evhttp_uri *uri;
+
+	if (! hostname)
+		return -1;
+	uri = evhttp_uri_parse (hostname);
+	if (fullname) {
+		const char *name = evhttp_uri_get_host (uri);
+		if (! name) {
+			size_t  len = strlen (hostname) + 8;
+			char   *name_buf = malloc (len);
+
+			if (uri)
+				evhttp_uri_free (uri);
+			snprintf (name_buf, len, "http://%s", hostname);
+			uri = evhttp_uri_parse (name_buf);
+			free (name_buf);
+			name = evhttp_uri_get_host (uri);
+		}
+		*fullname = (name ? strdup (name) : NULL);
+	}
+	if (port) {
+		*port = evhttp_uri_get_port (uri);
+		if (*port <= 0)
+			*port = 80;
+	}
+	if (uri)
+		evhttp_uri_free (uri);
+	return (! fullname || *fullname) ? 0 : -1;
+}
+
+/**
+ * create_state_request:
+ * @r: stream reader structure.
+ * @cb: request callback.
+ * @host: host to request.
+ * @userdata: pointer to user data allocated in heap (may be NULL).
+ *
+ * Creates and initialises HTTP request structure.
+ *
+ * Returns: pointer to newly allocated request structure
+ * or NULL on failure.
+ **/
+static StateRequest *
+create_state_request (StateReader  *r,
+                      void        (*cb) (struct evhttp_request *, void *),
+                      const char   *host,
+		      void         *userdata)
+{
+	StateRequest *sr = malloc (sizeof (*sr));
+	if (sr) {
+		char   *fullhostname;
+		int     port;
+
+		if (get_host_and_port (host, &fullhostname, &port) == 0) {
+			sr->r = r;
+			sr->userdata = userdata;
+			sr->conn = evhttp_connection_base_new (r->base, r->dnsbase, fullhostname, port);
+			if (sr->conn) {
+				sr->req = evhttp_request_new (cb, sr);
+				if (sr->req) {
+					evhttp_add_header (evhttp_request_get_output_headers (sr->req),
+							   "Host", host);
+					evhttp_add_header (evhttp_request_get_output_headers (sr->req),
+							   "User-Agent", PACKAGE_STRING);
+					return sr;
+				}
+				evhttp_connection_free (sr->conn);
+			}
+			free (fullhostname);
+		}
+		free (sr);
+	}
+	free (userdata);
+	return NULL;
+}
+
+/**
+ * destroy_state_request:
+ * @sr: HTTP request structure.
+ *
+ * Destroys @sr.
+ **/
+static void
+destroy_state_request (StateRequest *sr)
+{
+	if (! sr)
+		return;
+	if (sr->conn)
+		evhttp_connection_free (sr->conn);
+	free (sr->userdata);
+	free (sr);
+}
+
+/**
+ * do_destroy_state_request:
+ * @sr: HTTP request structure.
+ *
+ * Destroys @sr.
+ * Delegates execution to destroy_state_request.
+ **/
+static void
+do_destroy_state_request (evutil_socket_t sock, short what, void *sr)
+{
+	destroy_state_request (sr);
+}
+
+/**
+ * start_destroy_state_request:
+ * @sr: HTTP request structure.
+ *
+ * Deferred @sr destroying.
+ **/
+static void
+start_destroy_state_request (StateRequest *sr)
+{
+	if (! sr)
+		return;
+	event_base_once (sr->r->base, -1, EV_TIMEOUT, do_destroy_state_request, sr, NULL);
+}
+
+/**
+ * do_get_auth_cookie:
+ * @req: libevent's evhttp_request.
+ * @arg: HTTP request structure.
+ *
+ * start_get_auth_cookie callback.
+ * Retrieves authentication cookie from the response
+ * and calls start_getaddrinfo on success response.
+ * Initiates getting authentication cookie again on error response.
  *
  * For convenience sake, the cookie is never unencoded.
- *
- * Returns: cookie in newly allocated string or NULL on failure.
  **/
-char *
-obtain_auth_cookie (const char *host,
-		    const char *email,
-		    const char *password)
+static void
+do_get_auth_cookie (struct evhttp_request *req, void *arg)
 {
-	ne_session *sess;
-	ne_request *req;
-	char       *cookie = NULL, *body, *e_email, *e_password;
-	const char *header;
+	StateRequest *sr = arg;
+	int           code = evhttp_request_get_response_code (req);
+
+	start_destroy_state_request (sr);
+	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_AUTH;
+
+	if (! is_valid_http_response_code (code))
+		fprintf (stderr, "%s: %s: %s %d\n", program_name,
+			 _("login request failed"),
+			 _("HTTP response code"), code);
+	else {
+		const char *header = evhttp_find_header (evhttp_request_get_input_headers (req),
+		                                         "Set-Cookie");
+		if (header)
+			parse_cookie_hdr (&sr->r->cookie, header);
+	}
+
+	if (! is_valid_http_response_code (code))
+		start_get_auth_cookie (sr->r);
+	else if (sr->r->cookie) {
+		info (2, _("Authentication cookie obtained\n"));
+		start_getaddrinfo (sr->r);
+	} else {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("login failed: check email and password in ~/.f1rc"));
+		start_loopexit (sr->r->base);
+	}
+}
+
+/**
+ * start_get_auth_cookie:
+ * @r: stream reader structure.
+ *
+ * Initiates obtaining the user's authentication cookie from the
+ * Live Timing website by logging in with their e-mail address and password
+ * and stealing out of the response headers in callback (do_get_auth_cookie).
+ **/
+void
+start_get_auth_cookie (StateReader *r)
+{
+	StateRequest *sr;
+	char         *email, *password;
+
+	if (r->stop_handling_reason & STOP_HANDLING_REASON_AUTH)
+		return;
 
 	info (1, _("Obtaining authentication cookie ...\n"));
 
+	sr = create_state_request (r, do_get_auth_cookie, r->auth_host, NULL);
+	if (! sr)
+		return;
+	evhttp_add_header (evhttp_request_get_output_headers (sr->req), "Content-Type",
+			   "application/x-www-form-urlencoded");
+
 	/* Encode the e-mail and password as a form */
-	e_email = ne_path_escape (email);
-	e_password = ne_path_escape (password);
-	body = malloc (strlen (e_email) + strlen (e_password) + 17);
-	sprintf (body, "email=%s&password=%s", e_email, e_password);
-	free (e_password);
-	free (e_email);
+	email = evhttp_encode_uri (r->email);
+	password = evhttp_encode_uri (r->password);
+	if (email && password)
+		evbuffer_add_printf (evhttp_request_get_output_buffer (sr->req),
+		                     "email=%s&password=%s", email, password);
 
-	sess = ne_session_create ("http", host, 80);
-	ne_set_useragent (sess, PACKAGE_STRING);
-
-	/* Create the request */
-	req = ne_request_create (sess, "POST", LOGIN_URL);
-	ne_add_request_header (req, "Content-Type",
-			       "application/x-www-form-urlencoded");
-	ne_set_request_body_buffer (req, body, strlen (body));
-
-#if ! HAVE_NE_GET_RESPONSE_HEADER
-	/* Set the handler for the cookie header */
-	ne_add_response_header_handler (req, "Set-Cookie",
-					(ne_header_handler) parse_cookie_hdr,
-					&cookie);
-	header = NULL;
-#endif
-
-	/* Dispatch the event, and check it was a good one */
-	if (ne_request_dispatch (req)) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("login request failed"), ne_get_error (sess));
-		goto error;
-	} else if (ne_get_status (req)->code >= 400) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("login request failed"),
-			 ne_get_status (req)->reason_phrase);
-		goto error;
-	}
-
-#if HAVE_NE_GET_RESPONSE_HEADER
-	header = ne_get_response_header (req, "Set-Cookie");
-	if (header)
-		parse_cookie_hdr (&cookie, header);
-#endif
-
-	if (! cookie) {
+	if (! email || ! password || evhttp_make_request (sr->conn, sr->req,
+				                          EVHTTP_REQ_POST, LOGIN_URL)) {
 		fprintf (stderr, "%s: %s\n", program_name,
-			 _("login failed: check email and password in ~/.f1rc"));
-		goto fatal_error;
-	}
-
-error:
-	ne_request_destroy (req);
-	ne_session_destroy (sess);
-
-	return cookie;
-
-fatal_error:
-	ne_request_destroy (req);
-	ne_session_destroy (sess);
-
-	exit (2);
+			 _("login request failed"));
+		destroy_state_request (sr);
+	} else
+		r->stop_handling_reason |= STOP_HANDLING_REASON_AUTH;
+	free (password);
+	free (email);
 }
 
 /**
  * parse_cookie_hdr:
- * @value: pointer to store allocated string,
+ * @value: pointer to store allocated string.
  * @header: header to parse.
  *
  * Parses an HTTP cookie header looking for the USER cookie, and if found
@@ -182,205 +349,381 @@ parse_cookie_hdr (char       **value,
 }
 
 /**
- * obtain_decryption_key:
- * @host: host to obtain key from,
- * @event_no: official event number,
- * @cookie: uri-encoded cookie.
+ * destroy_sr_result:
+ * @res: HTTP request result.
  *
- * Obtains the decryption key for the event using the authorisation
- * cookie of a registered user.
- *
- * @cookie should be supplied already uri-encoded.
- *
- * Returns: key obtained on success, or zero on failure.
+ * Destroys @res.
+ * Frees @res->userdata.
  **/
-unsigned int
-obtain_decryption_key (const char   *host,
-		       unsigned int  event_no,
-		       const char   *cookie)
+static void
+destroy_sr_result (StateRequestResult *res)
 {
-	ne_session   *sess;
-	ne_request   *req;
-	char         *url;
-	unsigned int  key = 0;
-
-	info (1, _("Obtaining decryption key ...\n"));
-
-	url = malloc (strlen (KEY_URL_BASE) + numlen (event_no)
-		      + strlen (cookie) + 11);
-	sprintf (url, "%s%u.asp?auth=%s", KEY_URL_BASE, event_no, cookie);
-
-	sess = ne_session_create ("http", host, 80);
-	ne_set_useragent (sess, PACKAGE_STRING);
-
-	/* Create the request */
-	req = ne_request_create (sess, "GET", url);
-	ne_add_response_body_reader (req, ne_accept_2xx,
-				     (ne_block_reader) parse_key_body, &key);
-	free (url);
-
-	/* Dispatch the event */
-	if (ne_request_dispatch (req)) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key request failed"), ne_get_error (sess));
-	}
-
-	info (3, _("Got decryption key: %08x\n"), key);
-
-	ne_request_destroy (req);
-	ne_session_destroy (sess);
-
-	return key;
+	if (! res)
+		return;
+	if (res->response)
+		evbuffer_free (res->response);
+	free (res->userdata);
+	free (res);
 }
 
 /**
- * parse_key_body:
- * @key: pointer to store decryption key in,
- * @buf: buffer of data received from server,
+ * create_sr_result:
+ * @sr: HTTP request.
+ * @req: libevent's evhttp_request.
+ *
+ * Creates and initialises HTTP request result.
+ *
+ * Returns: pointer to newly allocated HTTP request result structure
+ * or NULL on failure.
+ **/
+static StateRequestResult *
+create_sr_result (StateRequest *sr, struct evhttp_request *req)
+{
+	StateRequestResult *res = malloc (sizeof (*res));
+
+	if (! res)
+		return NULL;
+
+	res->r = sr->r;
+	res->response = evbuffer_new ();
+	evbuffer_add_buffer (res->response, evhttp_request_get_input_buffer (req));
+
+	res->userdata = sr->userdata;
+	sr->userdata = NULL;
+
+	return res;
+}
+
+/**
+ * parse_sr_result:
+ * @number[out]: number to save parsing result.
+ * @res[in]: HTTP request result structure.
+ * @parser[in]: parse function.
+ *
+ * Parses HTTP response (@res->response) by @parser function
+ * and writes result in @number.
+ * @parser has following arguments: number to save (intermediate) result,
+ * pointer to first symbol and symbols count. @parser may be called
+ * next times if HTTP response doesn't stores in one contiguous chain.
+ **/
+static void
+parse_sr_result (unsigned int        *number,
+                 StateRequestResult  *res,
+		 void               (*parser) (unsigned int *, const char *, size_t))
+{
+	unsigned int num = 0;
+
+	while (evbuffer_get_contiguous_space (res->response)) {
+		struct evbuffer_iovec chain;
+
+		evbuffer_peek (res->response, -1, NULL, &chain, 1);
+		(*parser) (&num, chain.iov_base, chain.iov_len);
+		evbuffer_drain (res->response, chain.iov_len);
+	}
+	*number = num;
+}
+
+/**
+ * do_get_decryption_key:
+ * @req: libevent's evhttp_request.
+ * @arg: HTTP request structure.
+ *
+ * start_get_decryption_key callback.
+ * Retrieves decryption key from the response and calls continue_parse_stream
+ * on success response.
+ **/
+static void
+do_get_decryption_key (struct evhttp_request *req, void *arg)
+{
+	StateRequest *sr = arg;
+	int           code = evhttp_request_get_response_code (req);
+	int           success = 0;
+
+	start_destroy_state_request (sr);
+	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_KEY;
+
+	if (is_valid_http_response_code (code)) {
+		StateRequestResult *res;
+
+		info (2, _("Decryption key obtained\n"));
+		res = create_sr_result (sr, req);
+		if (res) {
+			EventNumTypePair *evnt = res->userdata;
+
+			if (evnt) {
+				parse_sr_result (&sr->r->decryption_key, res, parse_hex_number);
+				info (3, _("Got decryption key: %08x\n"), sr->r->decryption_key);
+				info (3, _("Begin new event #%d (type: %d)\n"), evnt->no, evnt->type);
+
+				reset_decryption (sr->r);
+				continue_parse_stream (sr->r);
+				success = 1;
+			}
+			destroy_sr_result (res);
+		}
+	} else
+		fprintf (stderr, "%s: %s: %s %d\n", program_name,
+			 _("key request failed"),
+			 _("HTTP response code"), code);
+	if (! success)
+		sr->r->decryption_failure = 1; //TODO: try again here ?
+}
+
+/**
+ * start_get_decryption_key:
+ * @r: stream reader structure.
+ *
+ * Initiates obtaining the decryption key for the event
+ * using the authorisation cookie of a registered user.
+ * Decryption key will be obtained in callback (do_get_decryption_key).
+ *
+ * Cookie should be supplied already uri-encoded.
+ **/
+void
+start_get_decryption_key (StateReader *r)
+{
+	StateRequest     *sr;
+	EventNumTypePair *evnt;
+	size_t            len;
+	char             *url;
+
+	if (r->stop_handling_reason & STOP_HANDLING_REASON_KEY)
+		return;
+
+	info (1, _("Obtaining decryption key ...\n"));
+
+	evnt = malloc (sizeof (*evnt));
+	if (! evnt)
+		return;
+	evnt->no = r->new_event_no;
+	evnt->type = r->new_event_type;
+
+	sr = create_state_request (r, do_get_decryption_key, r->host, evnt);
+	if (! sr)
+		return;
+
+	len = strlen (KEY_URL_BASE) + numlen (evnt->no) + strlen (r->cookie) + 11;
+	url = malloc (len);
+	if (url)
+		snprintf (url, len,
+		          "%s%u.asp?auth=%s", KEY_URL_BASE, evnt->no, r->cookie);
+
+	if (! url || evhttp_make_request (sr->conn, sr->req,
+				          EVHTTP_REQ_GET, url)) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("key request failed"));
+		destroy_state_request (sr);
+		r->decryption_failure = 1;
+	} else
+		r->stop_handling_reason |= STOP_HANDLING_REASON_KEY;
+	free (url);
+}
+
+/**
+ * parse_hex_number:
+ * @num: pointer to store result in.
+ * @buf: buffer containing data received from server.
  * @len: length of buffer.
  *
- * Parse data received from the server in response to the key request,
- * filling the decryption key while we can see hexadecimal digits.
+ * Parses data received from the server in response to the key request,
+ * filling the result while we can see hexadecimal digits.
  **/
-static int
-parse_key_body (unsigned int *key,
-		const char   *buf,
-		size_t        len)
+static void
+parse_hex_number (unsigned int *num,
+		  const char   *buf,
+		  size_t        len)
 {
 	size_t i;
 
 	for (i = 0; i < len; i++) {
 		if ((buf[i] >= '0') && (buf[i] <= '9')) {
-			*key = (*key << 4) | (buf[i] - '0');
+			*num = (*num << 4) | (buf[i] - '0');
 		} else if ((buf[i] >= 'a') && (buf[i] <= 'f')) {
-			*key = (*key << 4) | (buf[i] - 'a' + 10);
+			*num = (*num << 4) | (buf[i] - 'a' + 10);
 		} else if ((buf[i] >= 'A') && (buf[i] <= 'F')) {
-			*key = (*key << 4) | (buf[i] - 'A' + 10);
+			*num = (*num << 4) | (buf[i] - 'A' + 10);
 		} else {
 			break;
 		}
 	}
-
-	return 0;
 }
 
 /**
- * obtain_key_frame:
- * @host: host to obtain key frame from,
- * @frame: key frame number to obtain,
- * @userdata: pointer to pass to stream parser.
+ * do_get_key_frame:
+ * @req: libevent's evhttp_request.
+ * @arg: HTTP request structure.
  *
- * Obtains the key frame numbered from the website and arranges for the
- * data to be parsed immediately with the data stream parser.
- *
- * Returns: 0 on success, non-zero on failure.
+ * start_get_key_frame callback.
+ * Calls read_stream on success response
+ * (inserts received key frame before input, then parses all input).
  **/
-int
-obtain_key_frame (const char   *host,
-		  unsigned int  frame,
-		  void         *userdata)
+static void
+do_get_key_frame (struct evhttp_request *req, void *arg)
 {
-	ne_session *sess;
-	ne_request *req;
-	char       *url;
+	StateRequest *sr = arg;
+	int           code = evhttp_request_get_response_code (req);
 
-	if (frame > 0) {
-		info (2, _("Obtaining key frame %d ...\n"), frame);
+	start_destroy_state_request (sr);
+	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_FRAME;
 
-		url = malloc (strlen (KEYFRAME_URL_PREFIX)
-			      + MAX (numlen (frame), 5) + 6);
-		sprintf (url, "%s_%05d.bin", KEYFRAME_URL_PREFIX, frame);
-	} else {
+	if (is_valid_http_response_code (code)) {
+		info (2, _("Key frame received\n"));
+		sr->r->frame = sr->r->new_frame;
+		read_stream (sr->r, evhttp_request_get_input_buffer (req), 1);
+
+		reset_decryption (sr->r);
+	} else
+		fprintf (stderr, "%s: %s: %s %d\n", program_name,
+			 _("key frame request failed"),
+			 _("HTTP response code"), code);
+	//TODO: try again on error ?
+}
+
+/**
+ * start_get_key_frame:
+ * @r: stream reader structure.
+ *
+ * Initiates obtaining the key frame from the website.
+ * Key frame will be obtained in callback (do_get_key_frame).
+ **/
+void
+start_get_key_frame (StateReader *r)
+{
+	StateRequest *sr;
+	size_t        len;
+	char         *url;
+
+	if (r->stop_handling_reason & STOP_HANDLING_REASON_FRAME)
+		return;
+
+	if (r->new_frame > 0)
+		info (2, _("Obtaining key frame %d ...\n"), r->new_frame);
+	else
 		info (2, _("Obtaining current key frame ...\n"));
 
-		url = malloc (strlen (KEYFRAME_URL_PREFIX) + 5);
-		sprintf (url, "%s.bin", KEYFRAME_URL_PREFIX);
+	sr = create_state_request (r, do_get_key_frame, r->host, NULL);
+	if (! sr)
+		return;
+
+	len = strlen (KEYFRAME_URL_PREFIX) +
+	      (r->new_frame > 0 ? MAX (numlen (r->new_frame), 5) + 1 : 0) + 5;
+	url = malloc (len);
+	if (url) {
+		if (r->new_frame > 0)
+			snprintf (url, len, "%s_%05d.bin", KEYFRAME_URL_PREFIX, r->new_frame);
+		else
+			snprintf (url, len, "%s.bin", KEYFRAME_URL_PREFIX);
 	}
 
-	sess = ne_session_create ("http", host, 80);
-	ne_set_useragent (sess, PACKAGE_STRING);
-
-	/* Create the request */
-	req = ne_request_create (sess, "GET", url);
-	ne_add_response_body_reader (req, ne_accept_2xx,
-				     (ne_block_reader) parse_stream_block,
-				     userdata);
+	if (! url || evhttp_make_request (sr->conn, sr->req,
+	                                  EVHTTP_REQ_GET, url)) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("key frame request failed"));
+		destroy_state_request (sr);
+	} else
+		r->stop_handling_reason |= STOP_HANDLING_REASON_FRAME;
 	free (url);
 
-	/* Dispatch the event */
-	if (ne_request_dispatch (req)) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			 _("key frame request failed"), ne_get_error (sess));
-
-		ne_request_destroy (req);
-		ne_session_destroy (sess);
-		return 1;
-	}
-
-	info (3, _("Key frame received\n"));
-
-	ne_request_destroy (req);
-	ne_session_destroy (sess);
-
-	return 0;
 }
 
 /**
- * obtain_total_laps:
+ * do_get_total_laps:
+ * @req: libevent's evhttp_request.
+ * @arg: HTTP request structure.
  *
- * Obtains the total number of laps for the race.
- *
- * Returns: total obtained on success, or zero on failure.
+ * start_get_total_laps callback.
+ * Retrieves total laps from the response, adds USER_SYS_TOTAL_LAPS packet
+ * to the packet cache and calls continue_parse_stream on success response.
  **/
-unsigned int
-obtain_total_laps ()
+static void
+do_get_total_laps (struct evhttp_request *req, void *arg)
 {
-	ne_session   *sess;
-	ne_request   *req;
-	unsigned int  total_laps = 0;
+	StateRequest *sr = arg;
+	int           code = evhttp_request_get_response_code (req);
 
-	sess = ne_session_create ("http", WEBSERVICE_HOST, 80);
-	ne_set_useragent (sess, PACKAGE_STRING);
+	start_destroy_state_request (sr);
+	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_TOTALLAPS;
 
-	/* Create the request */
-	req = ne_request_create (sess, "GET", "/laps.php");
-	ne_add_response_body_reader (req, ne_accept_2xx,
-				     (ne_block_reader) parse_number_body, &total_laps);
+	if (is_valid_http_response_code (code)) {
+		StateRequestResult *res;
 
-	/* Dispatch the request */
-	ne_request_dispatch (req);
+		info (2, _("Total laps obtained\n"));
+		res = create_sr_result (sr, req);
+		if (res) {
+			unsigned int        total_laps;
+			Packet              tlp;
 
-	ne_request_destroy (req);
-	ne_session_destroy (sess);
+			parse_sr_result (&total_laps, res, parse_dec_number);
+			tlp.car = 0;
+			tlp.type = USER_SYS_TOTAL_LAPS;
+			tlp.data = total_laps;
+			tlp.len = 0;
+			push_packet (&tlp, sr->r->saving_time); //TODO: check errors
+			info (3, _("Got total laps: %u\n"), total_laps);
 
-	return total_laps;
+			continue_parse_stream (sr->r);
+
+			destroy_sr_result (res);
+		}
+	} else
+		fprintf (stderr, "%s: %s: %s %d\n", program_name,
+			 _("total laps request failed"),
+			 _("HTTP response code"), code);
+	//TODO: try again on error ?
 }
 
 /**
- * parse_number_body:
- * @result: pointer to store result in,
- * @buf: buffer of data received from server,
+ * start_get_total_laps:
+ * @r: stream reader structure.
+ *
+ * Initiates obtaining the total number of laps for the race.
+ * Total laps will be obtained in callback (do_get_total_laps).
+ **/
+void
+start_get_total_laps (StateReader *r)
+{
+	StateRequest *sr;
+
+	if (r->stop_handling_reason & STOP_HANDLING_REASON_TOTALLAPS)
+		return;
+
+	info (1, _("Obtaining total laps ...\n"));
+
+	sr = create_state_request (r, do_get_total_laps, WEBSERVICE_HOST, NULL);
+	if (! sr)
+		return;
+
+	if (evhttp_make_request (sr->conn, sr->req,
+			         EVHTTP_REQ_GET, "/laps.php")) {
+		fprintf (stderr, "%s: %s\n", program_name,
+			 _("total laps request failed"));
+		destroy_state_request (sr);
+	} else
+		r->stop_handling_reason |= STOP_HANDLING_REASON_TOTALLAPS;
+}
+
+/**
+ * parse_dec_number:
+ * @num: pointer to store result in.
+ * @buf: buffer containing data received from server.
  * @len: length of buffer.
  *
- * Parse data received from the server in response to the request,
- * converting from ascii number digitsfilling the decryption key while we can see hexadecimal digits.
+ * Parses data received from the server in response to the total laps request,
+ * filling the result while we can see decimal digits.
  **/
-static int
-parse_number_body (unsigned int *result,
-		const char   *buf,
-		size_t        len)
+static void
+parse_dec_number (unsigned int *num,
+		  const char   *buf,
+		  size_t        len)
 {
 	size_t i;
 
 	for (i = 0; i < len; i++) {
-		if ((buf[i] >= '0') && (buf[i] <= '9'))
-		{
-			*result *= 10;
-			*result += buf[i] - '0';
+		if ((buf[i] >= '0') && (buf[i] <= '9')) {
+			*num *= 10;
+			*num += buf[i] - '0';
 		} else {
 			break;
 		}
 	}
-
-	return 0;
 }

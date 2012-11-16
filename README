@@ -15,14 +15,13 @@ Dependencies
 ------------
 
 live-f1 uses the standard curses library to display its output on an
-ordinary terminal, it uses the libneon library for the HTTP parts of
-the protocol.
+ordinary terminal, it uses the libevent library for the HTTP parts of
+the protocol and for asynchronous event notifications.
 
-To compile live-f1 you'll need the development versions of both
-installed, the Ubuntu/Debian package names are given below.
+To compile live-f1 you'll need both installed.
 
-	* ncurses 5.5 or later (libncurses5-dev)
-	* libneon 0.24 or later (libneon25-dev or libneon24-dev)
+	* ncurses 5.5 or later
+	* libevent 2.0.4 or later
 
 For detailed compilation and installation instructions see the INSTALL
 file, if you've checked live-f1 out from revision control or want to
@@ -48,5 +47,4 @@ automatically cleared and updated for the new session.
 To exit live-f1 press ENTER.
 
 Friday practice sessions often have up to 30 cars running, so if you
-wish to view the timing information for those you will need to ensure
-that the terminal has at least that number of lines available.
+wish to view the timing information for those you may move the screen.

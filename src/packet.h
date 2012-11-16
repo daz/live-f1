@@ -112,7 +112,8 @@ typedef enum {
 	SYS_SPEED		= 10,
 	SYS_TRACK_STATUS	= 11,
 	SYS_COPYRIGHT		= 12,
-	LAST_SYSTEM_PACKET
+	LAST_SYSTEM_PACKET,
+	USER_SYS_TOTAL_LAPS     = 128
 } SystemPacketType;
 	
 /**
@@ -147,30 +148,11 @@ typedef enum {
 	FL_LAP			= 8
 } SpeedPacketType;
 
-/**
- * Packet:
- * @car: index of car,
- * @type: type of packet,
- * @data: additional data in header,
- * @len: length of @payload,
- * @payload: (decrypted) data that followed the packet.
- *
- * This is the decoded packet structure, and is slightly easier to deal
- * with than the binary hideousness from the stream.  The @car index is
- * not the car's number, but the position on the grid at the start of the
- * race.
- **/
-typedef struct {
-	int car, type, data, len;
-
-	unsigned char payload[128];
-} Packet;
-
-
 SJR_BEGIN_EXTERN
 
-void handle_car_packet    (CurrentState *state, const Packet *packet);
-void handle_system_packet (CurrentState *state, const Packet *packet);
+void pre_handle_packet (StateReader *r, const Packet *packet);
+void handle_packet     (StateModel *m, const Packet *packet);
+void clear_model       (StateModel *m);
 
 SJR_END_EXTERN
 

@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2006 Scott James Remnant <scott@netsplit.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,21 +17,30 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_STREAM_H
-#define LIVE_F1_STREAM_H
+#ifndef LIVE_F1_PACKETDEF_H
+#define LIVE_F1_PACKETDEF_H
 
-#include <event2/buffer.h>
+#include <time.h>
 
-#include "live-f1.h"
+/**
+ * Packet:
+ * @car: index of car.
+ * @type: type of packet.
+ * @data: additional data in header.
+ * @len: length of @payload.
+ * @at: packet receiving timestamp.
+ * @payload: (decrypted) data that followed the packet.
+ *
+ * This is the decoded packet structure, and is slightly easier to deal
+ * with than the binary hideousness from the stream.  The @car index is
+ * not the car's number, but the position on the grid at the start of the
+ * race.
+ **/
+typedef struct {
+	int car, type, data, len;
+	time_t at;
 
+	unsigned char payload[128];
+} Packet;
 
-SJR_BEGIN_EXTERN
-
-void continue_parse_stream (StateReader *r);
-void read_stream           (StateReader *r, struct evbuffer *input, char before);
-void start_getaddrinfo     (StateReader *r);
-void reset_decryption      (StateReader *r);
-
-SJR_END_EXTERN
-
-#endif /* LIVE_F1_STREAM_H */
+#endif /* LIVE_F1_PACKETDEF_H */
