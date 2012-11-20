@@ -440,6 +440,7 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 	int           success = 0;
 
 	start_destroy_state_request (sr);
+/*	sr->r->decryption_obtaining = 0; */
 	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_KEY;
 
 	if (is_valid_http_response_code (code)) {
@@ -455,8 +456,8 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 				info (3, _("Got decryption key: %08x\n"), sr->r->decryption_key);
 				info (3, _("Begin new event #%d (type: %d)\n"), evnt->no, evnt->type);
 
-				reset_decryption (sr->r);
-				continue_parse_stream (sr->r);
+				sr->r->decryption_failure = 0;
+				continue_pre_handle_stream (sr->r);
 				success = 1;
 			}
 			destroy_sr_result (res);
@@ -466,7 +467,7 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 			 _("key request failed"),
 			 _("HTTP response code"), code);
 	if (! success)
-		sr->r->decryption_failure = 1; //TODO: try again here ?
+		sr->r->decryption_failure = 1;
 }
 
 /**
@@ -487,6 +488,7 @@ start_get_decryption_key (StateReader *r)
 	size_t            len;
 	char             *url;
 
+/*	if (r->decryption_obtaining) */
 	if (r->stop_handling_reason & STOP_HANDLING_REASON_KEY)
 		return;
 
@@ -515,6 +517,7 @@ start_get_decryption_key (StateReader *r)
 		destroy_state_request (sr);
 		r->decryption_failure = 1;
 	} else
+/*		r->decryption_obtaining = 1; */
 		r->stop_handling_reason |= STOP_HANDLING_REASON_KEY;
 	free (url);
 }
@@ -570,8 +573,6 @@ do_get_key_frame (struct evhttp_request *req, void *arg)
 		info (2, _("Key frame received\n"));
 		sr->r->frame = sr->r->new_frame;
 		read_stream (sr->r, evhttp_request_get_input_buffer (req), 1);
-
-		reset_decryption (sr->r);
 	} else
 		fprintf (stderr, "%s: %s: %s %d\n", program_name,
 			 _("key frame request failed"),
@@ -658,10 +659,11 @@ do_get_total_laps (struct evhttp_request *req, void *arg)
 			tlp.type = USER_SYS_TOTAL_LAPS;
 			tlp.data = total_laps;
 			tlp.len = 0;
-			push_packet (&tlp, sr->r->saving_time); //TODO: check errors
+			tlp.at = sr->r->saving_time;
+			push_packet (sr->r->encrypted_cnum, &tlp); //TODO: check errors
 			info (3, _("Got total laps: %u\n"), total_laps);
 
-			continue_parse_stream (sr->r);
+			continue_pre_handle_stream (sr->r);
 
 			destroy_sr_result (res);
 		}

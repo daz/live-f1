@@ -86,14 +86,11 @@ static const struct option longopts[] = {
 static void
 reader_destroy (StateReader *r)
 {
-	destroy_packet_cache ();
+	destroy_packet_cache (r->encrypted_cnum);
+	destroy_packet_cache (r->input_cnum);
 	if (r->periodic) {
 		event_free (r->periodic);
 		r->periodic = NULL;
-	}
-	if (r->input) {
-		evbuffer_free (r->input);
-		r->input = NULL;
 	}
 	if (r->addr_head) {
 		evutil_freeaddrinfo (r->addr_head);
@@ -140,10 +137,13 @@ reader_create (StateReader *r, char replay_mode)
 		}
 		r->dnsbase = evdns_base_new (r->base, 1);
 		if (r->dnsbase) {
-			r->input = evbuffer_new ();
-			if (r->input) {
-				init_packet_cache ();
-				return 0;
+			r->input_cnum = init_packet_cache ();
+			if (r->input_cnum >= 0) {
+				r->encrypted_cnum = init_packet_cache ();
+				if (r->encrypted_cnum >= 0)
+					return 0;
+				else
+					res = 3;
 			} else
 				res = 3;
 		} else
@@ -170,17 +170,22 @@ model_destroy (StateModel *m)
 /**
  * model_create:
  * @m: model structure.
+ * @r: stream reader structure associated with @m.
  *
  * Constructs m.
  *
  * Returns: 0 on success, non-zero on failure.
  **/
 static int
-model_create (StateModel *m)
+model_create (StateModel *m, StateReader *r)
 {
+	if ((! m) || (! r))
+		return 1;
+
 	memset (m, 0, sizeof (*m));
 
-	init_packet_iterator (&m->iter);
+	m->r = r;
+	init_packet_iterator (r->encrypted_cnum, &m->iter);
 	m->event_type = RACE_EVENT;
 	clear_model (m);
 
@@ -199,24 +204,33 @@ model_create (StateModel *m)
 static int
 initialise_save (CurrentState *state, const char *name)
 {
-	int res = set_new_underlying_file (name, state->r.replay_mode);
+	int         cnums[2] = {state->r.input_cnum, state->r.encrypted_cnum};
+	const char *names[2] = {"/dev/null",         name                   };
+	char        modes[2] = {0,                   state->r.replay_mode   };
+	char        fakes[2] = {1,                   0                      };
+	size_t      i;
 
-	switch (res) {
-	case 0:
-		return 0;
-	case PACKETCACHE_ERR_FILE:
-		fprintf (stderr, _("Unable to open file %s (reason: %s)\n"),
-		         name, strerror (errno));
-		break;
-	case PACKETCACHE_ERR_VERSION:
-		fprintf (stderr, _("Unable to open file %s (reason: %s)\n"),
-		         name, _("unsupported timing file version"));
-		break;
-	default:
-		fprintf (stderr, _("Unable to open file %s (unknown reason)\n"),
-		         name);
+	for (i = 0; i != sizeof (cnums) / sizeof (cnums[0]); ++i) {
+		int res = set_new_underlying_file (cnums[i], names[i], modes[i], fakes[i]);
+
+		switch (res) {
+		case 0:
+			continue;
+		case PACKETCACHE_ERR_FILE:
+			fprintf (stderr, _("Unable to open file %s (reason: %s)\n"),
+				 names[i], strerror (errno));
+			break;
+		case PACKETCACHE_ERR_VERSION:
+			fprintf (stderr, _("Unable to open file %s (reason: %s)\n"),
+				 names[i], _("unsupported timing file version"));
+			break;
+		default:
+			fprintf (stderr, _("Unable to open file %s (cache errcode = %d)\n"),
+				 names[i], res);
+		}
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 /**
@@ -363,7 +377,7 @@ save_data (StateReader *r)
 	 * (see http://www.remlab.net/op/nonblock.shtml),
 	 * should use aio_write or threads.
 	 */
-	if (save_packets ())
+	if (save_packets (r->encrypted_cnum))
 		fprintf (stderr, _("Unable to write data file (reason: %s)\n"),
 		         strerror (errno));
 }
@@ -395,7 +409,8 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 	update_model_time (&state->m, ct);
 
 	while (((packet = get_packet (&state->m.iter)) != NULL) &&
-	       (packet->at <= state->m.model_time)) {
+	       (packet->at <= state->m.model_time) &&
+	       (state->r.decryption_key)) {
 		Packet pc = *packet; //TODO: duplicate iterator instead of Packet
 		if (to_next_packet (&state->m.iter) != 0)
 			break;
@@ -519,7 +534,7 @@ main (int   argc,
 		return 1;
 	}
 
-	if (model_create (&state.m)) {
+	if (model_create (&state.m, &state.r)) {
 		fprintf (stderr, "%s: %s\n", program_name,
 			 _("unable to initialise StateModel"));
 		reader_destroy (&state.r);

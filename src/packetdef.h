@@ -31,10 +31,11 @@
  * @at: packet receiving timestamp.
  * @payload: (decrypted) data that followed the packet.
  *
- * This is the decoded packet structure, and is slightly easier to deal
+ * This is the packet structure, and is slightly easier to deal
  * with than the binary hideousness from the stream.  The @car index is
  * not the car's number, but the position on the grid at the start of the
  * race.
+ * @payload may be encoded as well as decoded.
  **/
 typedef struct {
 	int car, type, data, len;

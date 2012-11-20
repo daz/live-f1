@@ -39,9 +39,6 @@
 #include "stream.h"
 
 
-/* Encryption seed */
-#define CRYPTO_SEED 0x55555555
-
 /* Which car the packet is for */
 #define PACKET_CAR(_p) ((_p)[0] & 0x1f)
 
@@ -69,8 +66,8 @@
 
 /* Forward prototypes */
 static void start_open_stream ();
-static int next_packet (StateReader *r, Packet *packet);
-static void parse_stream_block (StateReader *r);
+static int next_packet (struct evbuffer *input, Packet *packet);
+static void parse_stream (StateReader *r, struct evbuffer *input, char from_frame);
 
 
 /**
@@ -83,42 +80,44 @@ static void
 clear_reader (StateReader *r)
 {
 	r->decryption_key = 0;
+	r->decryption_failure = 0;
 	r->frame = 0;
-	reset_decryption (r);
 }
 
 /**
  * continue_parse_stream:
  * @r: stream reader structure.
  *
- * Continues stream parsing if parsing is permitted and non-parsed input
- * is present.
+ * Continues @r->input_cnum packets pre-handling if pre-handling is permitted.
+ * Packets are written to @r->encrypted_cnum cache in
+ * pre_handle_packet function.
+ * Drops every pre-handled packet.
  **/
 void
-continue_parse_stream (StateReader *r)
+continue_pre_handle_stream (StateReader *r)
 {
-	while ((! r->stop_handling_reason) && evbuffer_get_contiguous_space (r->input))
-		parse_stream_block (r);
+	const Packet *packet;
+
+	while ((! r->stop_handling_reason) &&
+	       ((packet = get_head_packet (r->input_cnum)) != NULL)) {
+		pre_handle_packet (r, packet, 0);
+		drop_head_packet (r->input_cnum);
+	}
 }
 
 /**
  * read_stream:
  * @r: stream reader structure.
  * @input: input buffer.
- * @before: true if @input must be inserted before non-parsed input.
+ * @from_frame: true if @input was received from key frame.
  *
- * Inserts read input from @input before or after non-parsed input, then
- * parses all input if parsing is permitted.
- * @input parameter flushes after inserting.
+ * Parses @input, then calls continue_pre_handle_stream.
  **/
 void
-read_stream (StateReader *r, struct evbuffer *input, char before)
+read_stream (StateReader *r, struct evbuffer *input, char from_frame)
 {
-	if (before)
-		evbuffer_add_buffer (input, r->input);
-	evbuffer_add_buffer (r->input, input);
-
-	continue_parse_stream (r);
+	parse_stream (r, input, from_frame);
+	continue_pre_handle_stream (r);
 }
 
 /**
@@ -373,45 +372,31 @@ start_getaddrinfo (StateReader *r)
 }
 
 /**
- * parse_stream_block:
- * @r: application reader structure.
+ * parse_stream:
+ * @r: stream reader structure.
+ * @input: input buffer.
+ * @from_frame: true if @input was received from key frame.
  *
- * Parses first input buffer chain (contiguous block of bytes). 
- * Every time when next_packet reaches end of packet, saves packet to cache
- * and calls pre_handle_packet.
+ * Parses @input (translates stream to packets). 
+ * Every time when next_packet reaches end of packet, pushes packet to
+ * @r->input_cnum (if from_frame == 0), or pre-handles packet
+ * (from_frame != 0) and pushes packet to @r->encrypted_cnum in that function.
+ * @input flushes after parsing.
  **/
 static void
-parse_stream_block (StateReader *r)
+parse_stream (StateReader *r, struct evbuffer *input, char from_frame)
 {
 	Packet packet;
+	time_t ct = from_frame ? r->saving_time : time (NULL);
 
-	while ((! r->stop_handling_reason) && next_packet (r, &packet)) {
-		push_packet (&packet, r->saving_time); //TODO: check errors
-		pre_handle_packet (r, &packet);
-	}
-}
-
-/**
- * decrypt_bytes:
- * @r: stream reader structure.
- * @buf: buffer to decrypt.
- * @len: number of bytes in @buf to decrypt.
- *
- * Decrypts the initial @len bytes of @buf modifying the buffer given,
- * rather than returning a new string.
- **/
-static void
-decrypt_bytes (StateReader   *r,
-	       unsigned char *buf,
-	       size_t         len)
-{
-	if (! r->decryption_key)
-		return;
-
-	while (len--) {
-		r->salt = ((r->salt >> 1) ^ (r->salt & 0x01 ? r->decryption_key : 0));
-		*(buf++) ^= (r->salt & 0xff);
-	}
+	while (evbuffer_get_contiguous_space (input))
+		while (next_packet (input, &packet)) {
+			packet.at = ct;
+			if (from_frame)
+				pre_handle_packet (r, &packet, from_frame);
+			else
+				push_packet (r->input_cnum, &packet); //TODO: check errors
+		}
 }
 
 /**
@@ -444,21 +429,20 @@ buffer_peekone (struct evbuffer *buf, struct evbuffer_iovec *chain)
  * at which point it fills @packet with the decoded information about it.
  * Drains bytes taken from input buffer. The bytes are copied
  * into an internal buffer so there's no need to worry about packets
- * crossing block boundaries. This internal buffer is static, so function
+ * crossing block boundaries. This internal buffer is static, so this function
  * is not reentrant.
  *
  * Returns: 0 if the packet was not complete, 1 if it is complete.
  **/
 static int
-next_packet (StateReader *r,
-	     Packet      *packet)
+next_packet (struct evbuffer *input,
+	     Packet          *packet)
 {
 	struct evbuffer_iovec chain;
 	static unsigned char  pbuf[129];
 	static size_t         pbuf_len = 0;
-	int                   decrypt = 0;
 
-	if (buffer_peekone (r->input, &chain) == 0)
+	if (buffer_peekone (input, &chain) == 0)
 		return 0;
 
 	/* We need a minimum of two bytes to figure out how long the rest
@@ -471,8 +455,8 @@ next_packet (StateReader *r,
 		memcpy (pbuf + pbuf_len, chain.iov_base, needed);
 
 		pbuf_len += needed;
-		evbuffer_drain (r->input, needed);
-		buffer_peekone (r->input, &chain);
+		evbuffer_drain (input, needed);
+		buffer_peekone (input, &chain);
 
 		if (pbuf_len < 2)
 			return 0;
@@ -493,17 +477,14 @@ next_packet (StateReader *r,
 		case CAR_POSITION_UPDATE:
 			packet->len = SPECIAL_PACKET_LEN (pbuf);
 			packet->data = SPECIAL_PACKET_DATA (pbuf);
-			decrypt = 0;
 			break;
 		case CAR_POSITION_HISTORY:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);
-			decrypt = 1;
 			break;
 		default:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
-			decrypt = 1;
 			break;
 		}
 	} else {
@@ -512,51 +493,38 @@ next_packet (StateReader *r,
 		case SYS_KEY_FRAME:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
-			decrypt = 0;
 			break;
 		case SYS_TIMESTAMP:
 			packet->len = 2;
 			packet->data = 0;
-			decrypt = 1;
 			break;
 		case SYS_WEATHER:
 		case SYS_TRACK_STATUS:
 			packet->len = SHORT_PACKET_LEN (pbuf);
 			packet->data = SHORT_PACKET_DATA (pbuf);
-			decrypt = 1;
 			break;
 		case SYS_COMMENTARY:
 		case SYS_NOTICE:
 		case SYS_SPEED:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);
-			decrypt = 1;
 			break;
 		case SYS_COPYRIGHT:
 			packet->len = LONG_PACKET_LEN (pbuf);
 			packet->data = LONG_PACKET_DATA (pbuf);
-			decrypt = 0;
 			break;
 		case SYS_VALID_MARKER:
 		case SYS_REFRESH_RATE:
 			packet->len = 0;
 			packet->data = 0;
-			decrypt = 0;
 			break;
 		default:
 			info (3, _("Unknown system packet type: %d\n"),
 			      packet->type);
 			packet->len = 0;
 			packet->data = 0;
-			decrypt = 0;
 			break;
 		}
-	}
-
-	/* Request key if data is decrypted */
-	if (decrypt && r->decryption_failure) {
-		start_get_decryption_key (r);
-		return 0;
 	}
 
 	/* Copy as much as we can of the rest of the packet */
@@ -569,8 +537,8 @@ next_packet (StateReader *r,
 		memcpy (pbuf + pbuf_len, chain.iov_base, needed);
 
 		pbuf_len += needed;
-		evbuffer_drain (r->input, needed);
-		buffer_peekone (r->input, &chain);
+		evbuffer_drain (input, needed);
+		buffer_peekone (input, &chain);
 
 		if (pbuf_len < (packet->len + 2))
 			return 0;
@@ -581,30 +549,13 @@ next_packet (StateReader *r,
 	 */
 	pbuf_len = 0;
 
-	/* Copy the payload and decrypt it */
+	/* Copy the payload */
 	if (packet->len > 0) {
 		memcpy (packet->payload, pbuf + 2, packet->len);
 		packet->payload[packet->len] = 0;
-
-		if (decrypt)
-			decrypt_bytes (r, packet->payload, packet->len);
 	} else {
 		packet->payload[0] = 0;
 	}
 
 	return 1;
-}
-
-/**
- * reset_decryption:
- * @r: stream reader structure.
- *
- * Resets the encryption salt to the initial seed; this begins the
- * cycle again.
- **/
-void
-reset_decryption (StateReader *r)
-{
-	r->decryption_failure = 0;
-	r->salt = CRYPTO_SEED;
 }

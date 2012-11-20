@@ -21,7 +21,6 @@
 #define LIVE_F1_PACKETCACHE_H
 
 #include <stddef.h>
-#include <time.h>
 
 #include "macros.h"
 
@@ -37,16 +36,20 @@
 #define PACKETCACHE_ERR_NOMEM    -3
 /* integer overflow */
 #define PACKETCACHE_ERR_OVERFLOW -4
+/* invalid cache number */
+#define PACKETCACHE_ERR_CNUM     -5
 
 
 /**
  * PacketIterator:
+ * @cnum: packet cache number.
  * @index: chunk index in array of chunks.
  * @pos: packet number in @index-th chunk.
  *
  * Points to packet in cache.
  **/
 typedef struct {
+	int    cnum;
 	size_t index;
 	size_t pos;
 } PacketIterator;
@@ -54,20 +57,22 @@ typedef struct {
 
 SJR_BEGIN_EXTERN
 
-void init_packet_iterator    (PacketIterator *it);
+void init_packet_iterator    (int cnum, PacketIterator *it);
 void destroy_packet_iterator (PacketIterator *it);
 
 int to_start_packet (PacketIterator *it);
 int to_next_packet  (PacketIterator *it);
 
-int            push_packet  (const Packet *packet, time_t saving_time);
-const Packet * get_packet   (PacketIterator *it);
-int            save_packets ();
+int            push_packet      (int cnum, const Packet *packet);
+const Packet * get_packet       (PacketIterator *it);
+int            save_packets     (int cnum);
+const Packet * get_head_packet  (int cnum);
+int            drop_head_packet (int cnum);
 
-void init_packet_cache    ();
-void destroy_packet_cache ();
+int  init_packet_cache    ();
+void destroy_packet_cache (int cnum);
 
-int set_new_underlying_file (const char *name, char replay_mode);
+int set_new_underlying_file (int cnum, const char *name, char replay_mode, char fake);
 
 SJR_END_EXTERN
 

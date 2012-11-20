@@ -27,10 +27,9 @@
 
 SJR_BEGIN_EXTERN
 
-void continue_parse_stream (StateReader *r);
-void read_stream           (StateReader *r, struct evbuffer *input, char before);
-void start_getaddrinfo     (StateReader *r);
-void reset_decryption      (StateReader *r);
+void continue_pre_handle_stream (StateReader *r);
+void read_stream                (StateReader *r, struct evbuffer *input, char before);
+void start_getaddrinfo          (StateReader *r);
 
 SJR_END_EXTERN
 

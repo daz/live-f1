@@ -34,60 +34,120 @@
 #include "packet.h"
 
 
+/* Encryption seed */
+#define CRYPTO_SEED 0x55555555
+
+
+/**
+ * decrypt_bytes:
+ * @decryption_key: decryption key.
+ * @salt: pointer to current decryption salt.
+ * @buf: buffer to decrypt.
+ * @len: number of bytes in @buf to decrypt.
+ *
+ * Decrypts the initial @len bytes of @buf modifying the buffer given,
+ * rather than returning a new string.
+ **/
+static void
+decrypt_bytes (unsigned int   decryption_key,
+	       unsigned int  *salt,
+	       unsigned char *buf,
+	       size_t         len)
+{
+	if ((! decryption_key) || (! salt))
+		return;
+
+	while (len--) {
+		*salt = ((*salt >> 1) ^ (*salt & 0x01 ? decryption_key : 0));
+		*(buf++) ^= (*salt & 0xff);
+	}
+}
+
+/**
+ * move_payload:
+ * @res[out]: buffer to write result to.
+ * @m[in]: model structure.
+ * @packet[in]: current packet.
+ * @decrypt[in]: true if decryption needed.
+ *
+ * Moves and optionally decrypts @packet->payload.
+ * @res must have space to contain 129 characters.
+ **/
+static void
+move_payload (unsigned char *res, StateModel *m, const Packet *packet, char decrypt)
+{
+	int len = MAX (0, packet->len);
+
+	len = MIN (len, 128);
+	if (len > 0) {
+		memcpy (res, packet->payload, len);
+		if (decrypt)
+			decrypt_bytes (m->r->decryption_key, &m->salt, res, len);
+	}
+	res[len] = 0;
+}
+
+/**
+ * reset_decryption:
+ * @salt: pointer to decryption salt.
+ *
+ * Resets the decryption salt to the initial seed; this begins the
+ * cycle again.
+ **/
+static void
+reset_decryption (unsigned int *salt)
+{
+	if (salt)
+		*salt = CRYPTO_SEED;
+}
+
 /**
  * pre_handle_car_packet:
  * @r: stream reader structure.
- * @packet: decoded packet structure.
+ * @packet: encoded packet structure.
+ * @from_frame: true if @packet was received from key frame.
  *
  * Pre-handling of the car-related packet.
- * Checks for decryption failure.
+ *
+ * Returns: 1 if @packet must be pushed to the @r->encrypted_cnum cache,
+ * 0 otherwise.
  **/
-static void
+static int
 pre_handle_car_packet (StateReader  *r,
-		       const Packet *packet)
+		       const Packet *packet,
+		       char from_frame)
 {
 	switch ((CarPacketType) packet->type) {
 	case CAR_POSITION_UPDATE:
-		info (4, _("\tgot CAR_POSITION_UPDATE (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
-		return;
+		info (4, _("\tgot CAR_POSITION_UPDATE\n"));
+		break;
 	case CAR_POSITION_HISTORY:
-		info (4, _("\tgot CAR_POSITION_HISTORY (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
-		return;
+		info (4, _("\tgot CAR_POSITION_HISTORY\n"));
+		break;
 	default:
-		info (4, _("\tgot CAR_DATA (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
-
-		/* Check for decryption failure */
-
-		if ((packet->type == 1) && (packet->len >= 0)) {
-			regex_t re;
-
-			regcomp(&re, "^[1-9][0-9]?$|^$", REG_EXTENDED|REG_NOSUB);
-
-			if (regexec(&re, packet->payload, (size_t)0, NULL, 0) != 0) {
-				info (3, _("Decryption failure\n"));
-				r->decryption_failure = 1;
-			}
-
-			regfree (&re);
-		}
+		info (4, _("\tgot CAR_DATA\n"));
 		break;
 	}
+	return 1;
 }
 
 /**
  * handle_car_packet:
  * @m: model structure.
- * @packet: decoded packet structure.
+ * @packet: encoded packet structure.
  *
- * Handle the car-related packet.
+ * Decrypts and handles the car-related packet.
+ * Checks for decryption failure.
  **/
 static void
 handle_car_packet (StateModel   *m,
 		   const Packet *packet)
 {
+	char decrypt = (CarPacketType) packet->type != CAR_POSITION_UPDATE;
+	unsigned char payload[129];
+
+	move_payload (payload, m, packet, decrypt);
+
 	/* Check whether a new car joined the event; actually, this is
 	 * because we never know in advance how many cars there are, and
 	 * things like practice sessions can probably have more than the
@@ -160,12 +220,27 @@ handle_car_packet (StateModel   *m,
 
 		info (4, _("\thandle CAR_DATA\n"));
 
+		/* Check for decryption failure */
+
+		if ((packet->type == 1) && (packet->len >= 0)) {
+			regex_t re;
+
+			regcomp(&re, "^[1-9][0-9]?$|^$", REG_EXTENDED|REG_NOSUB);
+
+			if (regexec(&re, payload, (size_t)0, NULL, 0) != 0) {
+				info (3, _("Decryption failure\n"));
+				m->r->decryption_failure = 1;
+			}
+
+			regfree (&re);
+		}
+
 		/* Store the atom */
 
 		atom = &m->car_info[packet->car - 1][packet->type];
 		atom->data = packet->data;
 		if (packet->len >= 0) {
-			strncpy (atom->text, (const char *) packet->payload,
+			strncpy (atom->text, (const char *) payload,
 			         sizeof (atom->text));
 			atom->text[sizeof (atom->text) - 1] = 0;
 		}
@@ -180,7 +255,7 @@ handle_car_packet (StateModel   *m,
 
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				number += packet->payload[i] - '0';
+				number += payload[i] - '0';
 			}
 
 			m->laps_completed = number;
@@ -242,15 +317,20 @@ clear_model (StateModel *m)
 /**
  * pre_handle_system_packet:
  * @r: stream reader structure.
- * @packet: decoded packet structure.
+ * @packet: encoded packet structure.
+ * @from_frame: true if @packet was received from key frame.
  *
  * Pre-handling of the system packet.
  * Initiates querying a decryption key, total laps or new key frame
  * if required.
+ *
+ * Returns: 1 if @packet must be pushed to the @r->encrypted_cnum cache,
+ * 0 otherwise.
  **/
-static void
+static int
 pre_handle_system_packet (StateReader  *r,
-		          const Packet *packet)
+		          const Packet *packet,
+			  char from_frame)
 {
 	switch ((SystemPacketType) packet->type) {
 		unsigned int number, i;
@@ -264,8 +344,7 @@ pre_handle_system_packet (StateReader  *r,
 		 * Indicates the start of an event, we use this to
 		 * obtain the decryption key for the event.
 		 */
-		info (4, _("\tgot SYS_EVENT_ID (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_EVENT_ID\n"));
 		number = 0;
 		for (i = 1; i < packet->len; i++) {
 			number *= 10;
@@ -285,8 +364,7 @@ pre_handle_system_packet (StateReader  *r,
 		 * load this to get up to date.  Otherwise we just set
 		 * our counter and carry on.
 		 */
-		info (4, _("\tgot SYS_KEY_FRAME (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_KEY_FRAME\n"));
 		number = 0;
 		i = packet->len;
 		while (i) {
@@ -295,70 +373,77 @@ pre_handle_system_packet (StateReader  *r,
 		}
 
 		decryption_failure = r->decryption_failure;
-		reset_decryption (r);
-		if (! r->decryption_key)
-			start_get_decryption_key (r);
+		/* Decryption key should be obtained only after key frame
+		 * receiving. Server returns null key otherwise.
+		 */
+//		if ((! r->decryption_key) || decryption_failure)
+//			start_get_decryption_key (r);
 		if ((! r->frame) || decryption_failure) {
 			r->new_frame = number;
 			start_get_key_frame (r);
 		} else
 			r->frame = number;
-
 		break;
 	case SYS_VALID_MARKER:
-		info (4, _("\tgot SYS_VALID_MARKER (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_VALID_MARKER\n"));
 		break;
 	case SYS_COMMENTARY:
-		info (4, _("\tgot SYS_COMMENTARY (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_COMMENTARY\n"));
 		break;
 	case SYS_REFRESH_RATE:
-		info (4, _("\tgot SYS_REFRESH_RATE (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_REFRESH_RATE\n"));
 		break;
 	case SYS_TIMESTAMP:
-		info (4, _("\tgot SYS_TIMESTAMP (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_TIMESTAMP\n"));
 		break;
 	case SYS_WEATHER:
-		info (4, _("\tgot SYS_WEATHER (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_WEATHER\n"));
 		break;
 	case SYS_SPEED:
-		info (4, _("\tgot SYS_SPEED (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_SPEED\n"));
 		break;
 	case SYS_TRACK_STATUS:
-		info (4, _("\tgot SYS_TRACK_STATUS (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_TRACK_STATUS\n"));
 		break;
 	case SYS_COPYRIGHT:
-		info (4, _("\tgot SYS_COPYRIGHT (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_COPYRIGHT\n"));
 		break;
 	case SYS_NOTICE:
-		info (4, _("\tgot SYS_NOTICE (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_NOTICE\n"));
 		break;
 	default:
-		info (4, _("\tgot SYS_UNKNOWN (rest = %u)\n"),
-		      evbuffer_get_length (r->input));
+		info (4, _("\tgot SYS_UNKNOWN\n"));
 		break;
 	}
+	return 1;
 }
 
 /**
  * handle_system_packet:
  * @m: model structure.
- * @packet: decoded packet structure.
+ * @packet: encoded packet structure.
  *
- * Handle the system packet.
+ * Decrypts and handles the system packet.
  **/
 static void
 handle_system_packet (StateModel   *m,
 		      const Packet *packet)
 {
+	char decrypt = 0;
+	unsigned char payload[129];
+
+	switch ((SystemPacketType) packet->type) {
+	case SYS_TIMESTAMP:
+	case SYS_WEATHER:
+	case SYS_TRACK_STATUS:
+	case SYS_COMMENTARY:
+	case SYS_NOTICE:
+	case SYS_SPEED:
+		decrypt = 1;
+	}
+
+	move_payload (payload, m, packet, decrypt);
+
 	switch ((SystemPacketType) packet->type) {
 		unsigned int number, i;
 
@@ -377,6 +462,11 @@ handle_system_packet (StateModel   *m,
 		break;
 	case SYS_KEY_FRAME:
 		info (4, _("\thandle SYS_KEY_FRAME\n"));
+		/* Salt must be resetted before and after every key frame;
+		 * every key frame ends with SYS_KEY_FRAME packet,
+		 * so we don't need to mark end of frame specially.
+		 */
+		reset_decryption (&m->salt);
 		break;
 	case SYS_VALID_MARKER:
 		/* Currently unhandled */
@@ -424,13 +514,13 @@ handle_system_packet (StateModel   *m,
 
 				total = number = 0;
 				for (i = 0; i < packet->len; i++) {
-					if (packet->payload[i] == ':') {
+					if (payload[i] == ':') {
 						total *= 60;
 						total += number;
 						number = 0;
 					} else {
 						number *= 10;
-						number += (packet->payload[i]
+						number += (payload[i]
 							   - '0');
 					}
 				}
@@ -449,7 +539,7 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				number += packet->payload[i] - '0';
+				number += payload[i] - '0';
 			}
 			m->track_temp = number;
 			update_status (m);
@@ -458,7 +548,7 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				number += packet->payload[i] - '0';
+				number += payload[i] - '0';
 			}
 			m->air_temp = number;
 			update_status (m);
@@ -467,8 +557,8 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				if (packet->payload[i] != '.')
-					number += packet->payload[i] - '0';
+				if (payload[i] != '.')
+					number += payload[i] - '0';
 			}
 			m->wind_speed = number;
 			update_status (m);
@@ -477,7 +567,7 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				number += packet->payload[i] - '0';
+				number += payload[i] - '0';
 			}
 			m->humidity = number;
 			update_status (m);
@@ -486,8 +576,8 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				if (packet->payload[i] != '.')
-					number += packet->payload[i] - '0';
+				if (payload[i] != '.')
+					number += payload[i] - '0';
 			}
 			m->pressure = number;
 			update_status (m);
@@ -496,7 +586,7 @@ handle_system_packet (StateModel   *m,
 			number = 0;
 			for (i = 0; i < packet->len; i++) {
 				number *= 10;
-				number += packet->payload[i] - '0';
+				number += payload[i] - '0';
 			}
 			m->wind_direction = number;
 			update_status (m);
@@ -514,21 +604,21 @@ handle_system_packet (StateModel   *m,
 		 * information to change.
 		 */
 		info (4, _("\thandle SYS_SPEED\n"));
-		switch (packet->payload[0]) {
+		switch (payload[0]) {
 		case FL_CAR:
-			memcpy(m->fl_car, packet->payload+1, 2);
+			memcpy(m->fl_car, payload+1, 2);
 			update_status (m);
 			break;
 		case FL_DRIVER:
-			memcpy(m->fl_driver, packet->payload+1, 14);
+			memcpy(m->fl_driver, payload+1, 14);
 			update_status (m);
 			break;
 		case FL_TIME:
-			memcpy(m->fl_time, packet->payload+1, 8);
+			memcpy(m->fl_time, payload+1, 8);
 			update_status (m);
 			break;
 		case FL_LAP:
-			memcpy(m->fl_lap, packet->payload+1, 2);
+			memcpy(m->fl_lap, payload+1, 2);
 			update_status (m);
 			break;
 		default:
@@ -550,7 +640,7 @@ handle_system_packet (StateModel   *m,
 			/* Flag currently in effect.
 			 * Decimal enum value.
 			 */
-			m->flag = packet->payload[0] - '0';
+			m->flag = payload[0] - '0';
 			update_status (m);
 			break;
 		default:
@@ -565,7 +655,7 @@ handle_system_packet (StateModel   *m,
 		 * Plain text copyright notice in the start of the feed.
 		 */
 		info (4, _("\thandle SYS_COPYRIGHT\n"));
-		info (2, "%s\n", packet->payload);
+		info (2, "%s\n", payload);
 		break;
 	case SYS_NOTICE:
 		/* Important System Notice:
@@ -574,7 +664,7 @@ handle_system_packet (StateModel   *m,
 		 * Various important system notices get displayed this way.
 		 */
 		info (4, _("\thandle SYS_NOTICE\n"));
-		info (0, "%s\n", packet->payload);
+		info (0, "%s\n", payload);
 		break;
 	case USER_SYS_TOTAL_LAPS:
 		info (4, _("\thandle USER_SYS_TOTAL_LAPS\n"));
@@ -591,20 +681,28 @@ handle_system_packet (StateModel   *m,
  * pre_handle_packet:
  * @r: stream reader structure.
  * @packet: decoded packet structure.
+ * @from_frame: true if @packet was received from key frame.
  *
  * Pre-handling of the @packet.
- * This function is triggered immediately after parsing and
- * getting new packet. It isn't called in replay mode.
+ * This function is triggered immediately after receiving and parsing data.
+ * It isn't called in replay mode.
  * Delegates execution to pre_handle_car_packet or pre_handle_system_packet.
+ * If called function returns 1 or from_frame is set,
+ * writes @packet to @r->encrypted_cnum cache.
  **/
 void
 pre_handle_packet (StateReader  *r,
-                   const Packet *packet)
+                   const Packet *packet,
+		   char from_frame)
 {
+	int res = 0;
+
 	if (packet->car)
-		pre_handle_car_packet (r, packet);
+		res = pre_handle_car_packet (r, packet, from_frame);
 	else
-		pre_handle_system_packet (r, packet);
+		res = pre_handle_system_packet (r, packet, from_frame);
+	if (res || from_frame)
+		push_packet (r->encrypted_cnum, packet); //TODO: check errors
 }
 
 /**
@@ -612,7 +710,7 @@ pre_handle_packet (StateReader  *r,
  * @m: model structure.
  * @packet: decoded packet structure.
  *
- * Handle the @packet.
+ * Handles the @packet.
  * This function is called for @m modification and further visualization
  * and may be delayed (see StateModel::time_gap and StateModel::replay_gap).
  * Delegates execution to handle_car_packet or handle_system_packet.

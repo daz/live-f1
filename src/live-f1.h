@@ -23,7 +23,6 @@
 #include <gettext.h>
 #include <time.h>
 
-#include <event2/buffer.h>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/util.h>
@@ -69,15 +68,15 @@ typedef enum {
 /**
  * StopHandlingReason:
  *
- * Reason of parse stopping.
- * Parsing process stops when we wait for receiving data
+ * Reason of stopping moving packets from one cache to another.
+ * Moving process stops when we wait for receiving data
  * from other source than live timing server.
  **/
 typedef enum {
 	STOP_HANDLING_REASON_AUTH      = 1,
 	STOP_HANDLING_REASON_CONNECT   = 2, /*reserved*/
 	STOP_HANDLING_REASON_FRAME     = 4,
-	STOP_HANDLING_REASON_KEY       = 8,
+	STOP_HANDLING_REASON_KEY       = 8,  //TODO: will be non-blocked
 	STOP_HANDLING_REASON_TOTALLAPS = 16
 } StopHandlingReason;
 
@@ -104,8 +103,11 @@ typedef struct {
  * @addr_head: pointer to first element in list returned by
  * asynchronous getaddrinfo request.
  * @addr: pointer to current element in list headed by @addr_head.
- * @input: buffer containing non-parsed data obtained
- * either from the data server or a key frame.
+ * @periodic: periodic event.
+ * @input_cnum: number of packet cache containing data received from
+ * the data server.
+ * @encrypted_cnum: number of packet cache containing encrypted data
+ * received either from the data server or a key frame.
  *
  * @host: hostname to contact.
  * @auth_host: authorisation host to contact.
@@ -114,10 +116,9 @@ typedef struct {
  * @password: user's password.
  * @cookie: user's authorisation cookie.
  * @decryption_key: decryption key.
- * @salt: current decryption salt.
  * @decryption_failure: indicates if payload decryption has failed.
- * @stop_handling_reason: reason of parsing suspension
- * (see StopHandlingReason).
+ * @stop_handling_reason: reason of suspension of moving from @input_cnum
+ * to @encrypted_cnum cache (see StopHandlingReason).
  * @saving_time: timestamp for parsing packets (packets received
  * from a key frame will get timestamp of this keyframe packet (@saving_time
  * freezes during querying key frame), packets received from the live timing
@@ -137,16 +138,17 @@ typedef struct {
 	struct evdns_base                *dnsbase;
 	struct evdns_getaddrinfo_request *gaireq;
 	struct evutil_addrinfo           *addr_head, *addr;
-	struct evbuffer                  *input;
 	struct event                     *periodic;
+	int                               input_cnum;
+	int                               encrypted_cnum;
 
 	char                             *host, *auth_host;
 	unsigned int                      port;
 	char                             *email, *password, *cookie;
-	unsigned int                      decryption_key, salt;
+	unsigned int                      decryption_key;
+//TODO:	char                              decryption_obtaining; /*bool*/
 	char                              decryption_failure; /*bool*/
 
-	//TODO: name as stop_parsing_reason ? (also STOP_PARSING_REASON_...)
 	int                               stop_handling_reason;
 	time_t                            saving_time;
 
@@ -158,7 +160,10 @@ typedef struct {
 
 /**
  * StateModel:
- * @iter: iterator pointed to current packet in the cache.
+ * @r: pointer to associated StateReader.
+ * @iter: iterator pointed to current packet in the @r->encrypted_cnum cache.
+ * @salt: current decryption salt.
+ * @event_type: current event type (practice/qualifying/race).
  * @paused: indicates whether visualization is paused.
  * @replay_gap: time gap between starting time of saving the replay
  * and starting time of replaying (0 for live mode).
@@ -191,7 +196,9 @@ typedef struct {
  * Model structure used for visualization.
  **/
 typedef struct {
+	StateReader       *r;
 	PacketIterator     iter;
+	unsigned int       salt;
 
 	EventType          event_type;
 

@@ -150,7 +150,7 @@ typedef enum {
 
 SJR_BEGIN_EXTERN
 
-void pre_handle_packet (StateReader *r, const Packet *packet);
+void pre_handle_packet (StateReader *r, const Packet *packet, char from_frame);
 void handle_packet     (StateModel *m, const Packet *packet);
 void clear_model       (StateModel *m);
 
