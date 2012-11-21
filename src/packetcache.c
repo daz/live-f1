@@ -441,6 +441,41 @@ destroy_packet_iterator (PacketIterator *it)
 }
 
 /**
+ * copy_packet_iterator:
+ * @dst: destination packet iterator.
+ * @src: copied packet iterator.
+ *
+ * Copies @src to @dst.
+ *
+ * Returns: 0 on success, < 0 on failure.
+ **/
+int
+copy_packet_iterator (PacketIterator *dst, const PacketIterator *src)
+{
+	int res;
+
+	if ((! dst) || (!src))
+		return 0;
+	if ((src->cnum < 0) || (src->cnum >= caches_count))
+		return cache_err_cnum;
+
+	res = change_chunk (src->cnum, src->index, 0);
+	if (res)
+		return res;
+	if ((dst->cnum >= 0) && (dst->cnum < caches_count)) {
+		res = change_chunk (dst->cnum, 0, dst->index);
+		if (res) {
+			/* rollback */
+			change_chunk (src->cnum, 0, src->index);
+			return res;
+		}
+	} else
+		init_packet_iterator (src->cnum, dst);
+
+	*dst = *src;
+}
+
+/**
  * to_start_packet:
  * @it: packet_iterator.
  *
@@ -496,6 +531,7 @@ load_final_packet (int cnum)
 		return res;
 	res = change_chunk (cnum, newindex, caches[cnum].itpush.index);
 	if (res) {
+		/* rollback */
 		change_chunk (cnum, caches[cnum].itwrite.index, newindex);
 		return res;
 	}
@@ -510,7 +546,7 @@ load_final_packet (int cnum)
 		    (read_func (cnum, hw->data, oiw.pos) != 0)) {
 			free (hw->data);
 			hw->data = NULL;
-			/* change chunks after freeing hw->data only
+			/* rollback after freeing hw->data only
 			 * (to avoid push_to_unused)
 			 */
 			change_chunk (cnum, caches[cnum].itpush.index, oip.index);
@@ -670,6 +706,7 @@ save_packets (int cnum)
 			int res = to_start_packet (&oiw);
 
 			if (res) {
+				/* rollback */
 				change_chunk (cnum, ip->index, oip.index);
 				return res;
 			}

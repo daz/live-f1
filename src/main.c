@@ -411,10 +411,20 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 	while (((packet = get_packet (&state->m.iter)) != NULL) &&
 	       (packet->at <= state->m.model_time) &&
 	       (state->r.decryption_key)) {
-		Packet pc = *packet; //TODO: duplicate iterator instead of Packet
-		if (to_next_packet (&state->m.iter) != 0)
+		PacketIterator it;
+		Packet pc;
+
+		init_packet_iterator (state->m.iter.cnum, &it);
+		if (copy_packet_iterator (&it, &state->m.iter) != 0) {
+			pc = *packet;
+			packet = &pc;
+		}
+		if (to_next_packet (&state->m.iter) != 0) {
+			destroy_packet_iterator (&it);
 			break;
-		handle_packet (&state->m, &pc);
+		}
+		handle_packet (&state->m, packet);
+		destroy_packet_iterator (&it);
 	}
 	save_data (&state->r);
 }

@@ -59,6 +59,7 @@ SJR_BEGIN_EXTERN
 
 void init_packet_iterator    (int cnum, PacketIterator *it);
 void destroy_packet_iterator (PacketIterator *it);
+int  copy_packet_iterator    (PacketIterator *dst, const PacketIterator *src);
 
 int to_start_packet (PacketIterator *it);
 int to_next_packet  (PacketIterator *it);
