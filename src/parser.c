@@ -1,6 +1,6 @@
 /* live-f1
  *
- * stream.c - data stream and key frame parsing //TODO: description
+ * parser.c - data stream and key frame parsing
  *
  * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
  *
@@ -25,18 +25,10 @@
 
 
 #include <sys/types.h>
-#include <errno.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-#include <event2/bufferevent.h>
-#include <event2/util.h>
-
-#include "live-f1.h"
-#include "display.h"
 #include "packet.h"
-#include "stream.h"
+#include "parser.h"
 
 
 /* Which car the packet is for */
@@ -63,341 +55,6 @@
 /* Length of the packet if it's a special one */
 #define SPECIAL_PACKET_LEN(_p) 0
 
-
-/* Forward prototypes */
-static void start_open_stream ();
-static int next_packet (struct evbuffer *input, Packet *packet);
-static void parse_stream (StateReader *r, struct evbuffer *input, char from_frame);
-
-
-/**
- * clear_reader:
- * @r: stream reader structure.
- *
- * Clears stream reader structure before reading.
- **/
-static void
-clear_reader (StateReader *r)
-{
-	r->decryption_key = 0;
-	r->decryption_failure = 0;
-	r->frame = 0;
-}
-
-/**
- * continue_pre_handle_stream:
- * @r: stream reader structure.
- *
- * Continues @r->input_cnum packets pre-handling if pre-handling is permitted.
- * Packets are written to @r->encrypted_cnum cache in
- * pre_handle_packet function.
- * Drops every pre-handled packet.
- **/
-void
-continue_pre_handle_stream (StateReader *r)
-{
-	const Packet *packet;
-
-	while ((! r->stop_handling_reason) &&
-	       ((packet = get_head_packet (r->input_cnum)) != NULL)) {
-		pre_handle_packet (r, packet, 0);
-		drop_head_packet (r->input_cnum);
-	}
-}
-
-/**
- * read_stream:
- * @r: stream reader structure.
- * @input: input buffer.
- * @from_frame: true if @input was received from key frame.
- *
- * Parses @input, then calls continue_pre_handle_stream.
- **/
-void
-read_stream (StateReader *r, struct evbuffer *input, char from_frame)
-{
-	parse_stream (r, input, from_frame);
-	continue_pre_handle_stream (r);
-}
-
-/**
- * do_read_stream:
- * @bev: libevent's bufferevent.
- * @r: stream reader structure.
- *
- * bufferevent reading callback. Delegates execution to read_stream.
- **/
-static void
-do_read_stream (struct bufferevent *bev, void *r)
-{
-	read_stream (r, bufferevent_get_input (bev), 0);
-}
-
-/**
- * do_write_stream:
- * @bev: libevent's bufferevent.
- * @r: stream reader structure.
- *
- * bufferevent writing callback.
- **/
-static void
-do_write_stream (struct bufferevent *bev, void *r)
-{
-	//TODO: write something to log or delete function
-}
-
-/**
- * do_reopen_stream:
- * @r: stream reader structure.
- *
- * Initiates reconnection to live timing server.
- **/
-static void
-do_reopen_stream (evutil_socket_t sock, short what, void *r)
-{
-	info (1, _("Reconnecting ...\n"));
-	start_getaddrinfo (r);
-}
-
-/**
- * start_reopen_stream:
- * @r: stream reader structure.
- *
- * Deferred initiation of a reconnection to live timing server.
- **/
-static void
-start_reopen_stream (StateReader *r)
-{
-	event_base_once (r->base, -1, EV_TIMEOUT, do_reopen_stream, r, NULL);
-}
-
-/**
- * handle_reading_event:
- * @bev: libevent's bufferevent.
- * @what: event reason.
- * @r: stream reader structure.
- *
- * Handles bufferevent reading event/error (see bufferevent_event_cb).
- *
- * Returns: 1 if reading was finished, 0 otherwise.
- **/
-static int
-handle_reading_event (struct bufferevent *bev, short what, StateReader *r)
-{
-	int fin = 0;
-
-	if (what & BEV_EVENT_TIMEOUT) {
-		/* ping server (server won't actually send us data
-		 * unless we ping it)*/
-		unsigned char buf[1] = {0x10};
-
-		bufferevent_enable (bev, EV_READ | EV_WRITE);
-		evbuffer_add (bufferevent_get_output (bev), buf, sizeof (buf));
-	}
-	if (what & BEV_EVENT_EOF) {
-		read_stream (r, bufferevent_get_input (bev), 0);
-		fin = 1;
-	}
-	if (what & BEV_EVENT_ERROR) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			_("error reading from data stream"),
-			evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
-		fin = 1;
-	}
-	if (fin) {
-		bufferevent_disable (bev, EV_READ);
-		start_reopen_stream (r);
-	}
-	return fin;
-}
-
-/**
- * handle_writing_event:
- * @bev: libevent's bufferevent.
- * @what: event reason.
- * @r: stream reader structure.
- *
- * Handles bufferevent writing event/error (see bufferevent_event_cb).
- *
- * Returns: 1 if error is detected, 0 otherwise.
- **/
-static int
-handle_writing_event (struct bufferevent *bev, short what, StateReader *r)
-{
-	if (what & BEV_EVENT_ERROR) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			_("error writing to data stream"),
-			evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
-		bufferevent_disable (bev, EV_WRITE);
-		return 1;
-	}
-	return 0;
-}
-
-/**
- * do_event_stream:
- * @bev: libevent's bufferevent.
- * @what: event reason.
- * @arg: stream reader structure.
- *
- * bufferevent event/error callback (see bufferevent_event_cb).
- * Enables reading (EV_READ) and writing (EV_WRITE) on successful connection,
- * calls start_open_stream for next attempt on failed connection,
- * calls handle_reading_event/handle_writing_event during
- * data transfer process.
- **/
-static void
-do_event_stream (struct bufferevent *bev, short what, void *arg)
-{
-	StateReader *r = arg;
-	int          fin = 0, finconnect = 0;
-
-	if (what & BEV_EVENT_CONNECTED) {
-		/* Ping interval (we shall ping server after last
-		 * server data receiving this time later).
-		 */
-		const struct timeval intrv = {1, 0};
-
-		finconnect = (bufferevent_enable (bev, EV_READ | EV_WRITE) != 0) ||
-		             (bufferevent_set_timeouts (bev, &intrv, NULL) != 0);
-		if (! finconnect) {
-			info (2, _("Connected to %s.\n"), r->addr->ai_canonname);
-			clear_reader (r);
-		}
-	} else if (what & BEV_EVENT_ERROR)
-		finconnect = ! (bufferevent_get_enabled (bev) & EV_READ);
-
-	if (what & BEV_EVENT_READING)
-		fin = handle_reading_event (bev, what, r) || fin;
-	if (what & BEV_EVENT_WRITING)
-		fin = handle_writing_event (bev, what, r) || fin;
-
-	if (fin || finconnect) {
-		bufferevent_free (bev);
-		info (3, _("bufferevent was destroyed\n"));
-		if (finconnect)
-			start_open_stream (r);
-	}
-}
-
-/**
- * start_open_stream:
- * @r: stream reader structure.
- *
- * Attempts to make a connection to next address in addresses list.
- * Creates bufferevent, but does not enable reading and writing
- * (they will be enabled at do_event_stream after successful connection).
- **/
-static void
-start_open_stream (StateReader *r)
-{
-	struct bufferevent *bev;
-
-	r->addr = r->addr ? r->addr->ai_next : r->addr_head;
-	for ( ; r->addr; r->addr = r->addr->ai_next) {
-		info (3, _("Trying %s ...\n"), r->addr->ai_canonname);
-
-		bev = bufferevent_socket_new (r->base, -1,
-					      BEV_OPT_CLOSE_ON_FREE | BEV_OPT_DEFER_CALLBACKS);
-		if (bev) {
-			info (3, _("bufferevent was created\n"));
-
-			bufferevent_setcb (bev, do_read_stream, do_write_stream,
-			                   do_event_stream, r);
-			if (bufferevent_socket_connect (bev, r->addr->ai_addr,
-			                                r->addr->ai_addrlen) == 0)
-				return;
-
-			bufferevent_free (bev);
-			info (3, _("bufferevent was destroyed\n"));
-		}
-	}
-	fprintf (stderr, "%s: %s\n", program_name,
-		 _("unable to open data stream"));
-	start_loopexit (r->base);
-}
-
-/**
- * do_getaddrinfo:
- * @errcode: evdns_getaddrinfo error code.
- * @res: addresses list.
- * @arg: stream reader structure.
- *
- * evdns_getaddrinfo callback.
- * Calls start_open_stream for first address in @res on success.
- **/
-static void
-do_getaddrinfo (int errcode, struct evutil_addrinfo *res, void *arg)
-{
-	StateReader *r = arg;
-
-	r->gaireq = NULL;
-	if (errcode) {
-		fprintf (stderr, "%s: %s: %s: %s\n", program_name,
-		         _("failed to resolve host"), r->host,
-			 evutil_gai_strerror (errcode));
-		start_loopexit (r->base);
-	} else {
-		info (1, _("Connecting to data stream ...\n"));
-
-		if (r->addr_head)
-			evutil_freeaddrinfo (r->addr_head);
-		r->addr_head = res;
-		r->addr = NULL;
-		start_open_stream (r);
-	}
-}
-
-/**
- * start_getaddrinfo:
- * @r: stream reader structure.
- *
- * Starts asynchronous getaddrinfo (evdns_getaddrinfo).
- **/
-void
-start_getaddrinfo (StateReader *r)
-{
-	struct evutil_addrinfo hints;
-	char   serv[6];
-
-	info (2, _("Looking up %s ...\n"), r->host);
-
-	snprintf (serv, 6, "%u", r->port);
-
-	memset (&hints, 0, sizeof (hints));
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = EVUTIL_AI_CANONNAME;
-
-	r->gaireq = evdns_getaddrinfo (r->dnsbase, r->host, serv, &hints, do_getaddrinfo, r);
-}
-
-/**
- * parse_stream:
- * @r: stream reader structure.
- * @input: input buffer.
- * @from_frame: true if @input was received from key frame.
- *
- * Parses @input (translates stream to packets). 
- * Every time when next_packet reaches end of packet, pushes packet to
- * @r->input_cnum (if from_frame == 0), or pre-handles packet
- * (from_frame != 0) and pushes packet to @r->encrypted_cnum in that function.
- * @input flushes after parsing.
- **/
-static void
-parse_stream (StateReader *r, struct evbuffer *input, char from_frame)
-{
-	Packet packet;
-	time_t ct = from_frame ? r->saving_time : time (NULL);
-
-	while (evbuffer_get_contiguous_space (input))
-		while (next_packet (input, &packet)) {
-			packet.at = ct;
-			if (from_frame)
-				pre_handle_packet (r, &packet, from_frame);
-			else
-				push_packet (r->input_cnum, &packet); //TODO: check errors
-		}
-}
 
 /**
  * buffer_peekone:
@@ -558,4 +215,30 @@ next_packet (struct evbuffer *input,
 	}
 
 	return 1;
+}
+
+/**
+ * parse_stream:
+ * @input: input buffer.
+ * @handler: new packet handler callback.
+ * @r: @handler's second argument (stream reader structure).
+ * @ct: @handler's third argument (new packet's timestamp).
+ *
+ * Parses @input (translates stream to packets). 
+ * Every time when next_packet reaches end of packet,
+ * calls @handler (&newpacket, r, ct).
+ * @input flushes after parsing.
+ **/
+void
+parse_stream (struct evbuffer *input,
+	      void (* handler) (Packet *, void *, time_t),
+	      void *r,
+	      time_t ct)
+{
+	Packet packet;
+
+	while (evbuffer_get_contiguous_space (input))
+		while (next_packet (input, &packet))
+			if (handler)
+				handler (&packet, r, ct);
 }

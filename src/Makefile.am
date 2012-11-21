@@ -18,6 +18,7 @@ live_f1_SOURCES = \
 	http.c http.h \
 	packet.c packet.h \
 	stream.c stream.h \
+	parser.c parser.h \
 	packetcache.c packetcache.h \
 	packetdef.h
 
