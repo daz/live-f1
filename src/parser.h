@@ -23,6 +23,9 @@
 #include <event2/buffer.h>
 #include <time.h>
 
+#include "packetdef.h"
+#include "macros.h"
+
 
 SJR_BEGIN_EXTERN
 

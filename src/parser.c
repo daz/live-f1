@@ -27,7 +27,6 @@
 #include <sys/types.h>
 #include <string.h>
 
-#include "packet.h"
 #include "parser.h"
 
 
@@ -176,8 +175,6 @@ next_packet (struct evbuffer *input,
 			packet->data = 0;
 			break;
 		default:
-			info (3, _("Unknown system packet type: %d\n"),
-			      packet->type);
 			packet->len = 0;
 			packet->data = 0;
 			break;

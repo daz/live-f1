@@ -412,7 +412,8 @@ pre_handle_system_packet (StateReader  *r,
 		info (4, _("\tgot SYS_NOTICE\n"));
 		break;
 	default:
-		info (4, _("\tgot SYS_UNKNOWN\n"));
+		info (3, _("\tgot unknown system packet (type = %d)\n"),
+		      packet->type);
 		break;
 	}
 	return 1;
@@ -672,7 +673,8 @@ handle_system_packet (StateModel   *m,
 		break;
 	default:
 		/* Unhandled event */
-		info (4, _("\thandle SYS_UNKNOWN (type = %d)\n"), packet->type);
+		info (4, _("\thandle unknown system packet (type = %d)\n"),
+		      packet->type);
 		break;
 	}
 }
