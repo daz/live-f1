@@ -1,6 +1,6 @@
 /* live-f1
  *
- * stream.c - data stream and key frame parsing
+ * stream.c - data stream and key frame parsing //TODO: description
  *
  * Copyright © 2005 Scott James Remnant <scott@netsplit.com>.
  *
@@ -85,7 +85,7 @@ clear_reader (StateReader *r)
 }
 
 /**
- * continue_parse_stream:
+ * continue_pre_handle_stream:
  * @r: stream reader structure.
  *
  * Continues @r->input_cnum packets pre-handling if pre-handling is permitted.

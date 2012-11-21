@@ -429,8 +429,8 @@ parse_sr_result (unsigned int        *number,
  * @arg: HTTP request structure.
  *
  * start_get_decryption_key callback.
- * Retrieves decryption key from the response and calls continue_parse_stream
- * on success response.
+ * Retrieves decryption key from the response and calls
+ * continue_pre_handle_stream on success response.
  **/
 static void
 do_get_decryption_key (struct evhttp_request *req, void *arg)
@@ -634,7 +634,8 @@ start_get_key_frame (StateReader *r)
  *
  * start_get_total_laps callback.
  * Retrieves total laps from the response, adds USER_SYS_TOTAL_LAPS packet
- * to the packet cache and calls continue_parse_stream on success response.
+ * to the packet cache and calls continue_pre_handle_stream on
+ * success response.
  **/
 static void
 do_get_total_laps (struct evhttp_request *req, void *arg)
