@@ -74,6 +74,20 @@ reset_decryption (unsigned int *salt)
 }
 
 /**
+ * is_reset_decryption_packet:
+ * @packet: pointer to checked packet.
+ *
+ * Returns: 1 if @packet requires decryption salt resetting
+ * (key frame packet), 0 otherwise.
+ **/
+int
+is_reset_decryption_packet (const Packet *packet)
+{
+	return packet && (! packet->car) && ((packet->type == USER_SYS_KEY) ||
+	       (packet->type == SYS_EVENT_ID) || (packet->type == SYS_KEY_FRAME));
+}
+
+/**
  * is_valid_decrypted_data:
  * @packet: pointer to checked packet.
  * @payload: checked packet's payload

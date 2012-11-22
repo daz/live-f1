@@ -102,8 +102,8 @@ typedef enum {
 /**
  * SystemPacketType:
  *
- * Known types of packets that aren't related to cars, covering a wide
- * range of different formats and data.
+ * Known types (as well as user-defined types) of packets that aren't related
+ * to cars, covering a wide range of different formats and data.
  **/
 typedef enum {
 	SYS_EVENT_ID		= 1,
@@ -118,7 +118,9 @@ typedef enum {
 	SYS_TRACK_STATUS	= 11,
 	SYS_COPYRIGHT		= 12,
 	LAST_SYSTEM_PACKET,
-	USER_SYS_TOTAL_LAPS     = 128
+	USER_SYS_TOTAL_LAPS	= 128,
+	USER_SYS_KEY		= 129,
+	LAST_USER_SYSTEM_PACKET
 } SystemPacketType;
 	
 /**

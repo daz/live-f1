@@ -1,6 +1,6 @@
 /* live-f1
  *
- * Copyright © 2010 Scott James Remnant <scott@netsplit.com>.
+ * Copyright © 2012 Yuriy Mishkov <ymishkov@gmail.com>.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,25 +17,19 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
-#ifndef LIVE_F1_CRYPT_H
-#define LIVE_F1_CRYPT_H
+#ifndef LIVE_F1_KEYREV_H
+#define LIVE_F1_KEYREV_H
 
 #include "macros.h"
 #include "packetdef.h"
+/*#include "packetcache.h"*/
 
 
 SJR_BEGIN_EXTERN
 
-void decrypt_bytes              (unsigned int   decryption_key,
-				 unsigned int  *salt,
-				 unsigned char *buf,
-				 size_t         len);
-void reset_decryption           (unsigned int *salt);
-int  is_reset_decryption_packet (const Packet *packet);
-int  is_valid_decrypted_data    (const Packet *packet,
-				 const unsigned char *payload);
-int  is_crypted                 (const Packet *packet);
+int reverse_key (unsigned int *key, const Packet *p);
+/*int reverse_key (unsigned int *key, PacketIterator *from, const PacketIterator *to);*/
 
 SJR_END_EXTERN
 
-#endif /* LIVE_F1_CRYPT_H */
+#endif /* LIVE_F1_KEYREV_H */
