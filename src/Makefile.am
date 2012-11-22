@@ -17,6 +17,7 @@ live_f1_SOURCES = \
 	display.c display.h \
 	http.c http.h \
 	packet.c packet.h \
+	crypt.c crypt.h \
 	stream.c stream.h \
 	parser.c parser.h \
 	packetcache.c packetcache.h \

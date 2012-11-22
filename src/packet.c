@@ -26,42 +26,11 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <regex.h>
 
-#include "live-f1.h"
+#include "crypt.h"
 #include "display.h"
-#include "stream.h"
 #include "packet.h"
 
-
-/* Encryption seed */
-#define CRYPTO_SEED 0x55555555
-
-
-/**
- * decrypt_bytes:
- * @decryption_key: decryption key.
- * @salt: pointer to current decryption salt.
- * @buf: buffer to decrypt.
- * @len: number of bytes in @buf to decrypt.
- *
- * Decrypts the initial @len bytes of @buf modifying the buffer given,
- * rather than returning a new string.
- **/
-static void
-decrypt_bytes (unsigned int   decryption_key,
-	       unsigned int  *salt,
-	       unsigned char *buf,
-	       size_t         len)
-{
-	if ((! decryption_key) || (! salt))
-		return;
-
-	while (len--) {
-		*salt = ((*salt >> 1) ^ (*salt & 0x01 ? decryption_key : 0));
-		*(buf++) ^= (*salt & 0xff);
-	}
-}
 
 /**
  * move_payload:
@@ -71,34 +40,26 @@ decrypt_bytes (unsigned int   decryption_key,
  * @decrypt[in]: true if decryption needed.
  *
  * Moves and optionally decrypts @packet->payload.
- * @res must have space to contain 129 characters.
+ * If @packet->payload is encrypted, checks it after decryption.
+ * @res must have space to contain MAX_PACKET_LEN + 1 characters.
  **/
 static void
 move_payload (unsigned char *res, StateModel *m, const Packet *packet, char decrypt)
 {
 	int len = MAX (0, packet->len);
 
-	len = MIN (len, 128);
+	len = MIN (len, MAX_PACKET_LEN);
 	if (len > 0) {
 		memcpy (res, packet->payload, len);
-		if (decrypt)
+		if (decrypt) {
 			decrypt_bytes (m->r->decryption_key, &m->salt, res, len);
+			if (! is_valid_decrypted_data (packet, res)) {
+				info (3, _("Decryption failure\n"));
+				m->r->decryption_failure = 1;
+			}
+		}
 	}
 	res[len] = 0;
-}
-
-/**
- * reset_decryption:
- * @salt: pointer to decryption salt.
- *
- * Resets the decryption salt to the initial seed; this begins the
- * cycle again.
- **/
-static void
-reset_decryption (unsigned int *salt)
-{
-	if (salt)
-		*salt = CRYPTO_SEED;
 }
 
 /**
@@ -143,10 +104,9 @@ static void
 handle_car_packet (StateModel   *m,
 		   const Packet *packet)
 {
-	char decrypt = (CarPacketType) packet->type != CAR_POSITION_UPDATE;
-	unsigned char payload[129];
+	unsigned char payload[MAX_PACKET_LEN + 1];
 
-	move_payload (payload, m, packet, decrypt);
+	move_payload (payload, m, packet, is_crypted (packet));
 
 	/* Check whether a new car joined the event; actually, this is
 	 * because we never know in advance how many cars there are, and
@@ -203,11 +163,11 @@ handle_car_packet (StateModel   *m,
 		m->car_position[packet->car - 1] = packet->data;
 		if (packet->data)
 			update_car (m, packet->car);
-		return;
+		break;
 	case CAR_POSITION_HISTORY:
 		/* Currently unhandled */
 		info (4, _("\thandle CAR_POSITION_HISTORY\n"));
-		return;
+		break;
 	default:
 		/* Data Atom:
 		 * Format: string.
@@ -219,21 +179,6 @@ handle_car_packet (StateModel   *m,
 		 */
 
 		info (4, _("\thandle CAR_DATA\n"));
-
-		/* Check for decryption failure */
-
-		if ((packet->type == 1) && (packet->len >= 0)) {
-			regex_t re;
-
-			regcomp(&re, "^[1-9][0-9]?$|^$", REG_EXTENDED|REG_NOSUB);
-
-			if (regexec(&re, payload, (size_t)0, NULL, 0) != 0) {
-				info (3, _("Decryption failure\n"));
-				m->r->decryption_failure = 1;
-			}
-
-			regfree (&re);
-		}
 
 		/* Store the atom */
 
@@ -430,20 +375,9 @@ static void
 handle_system_packet (StateModel   *m,
 		      const Packet *packet)
 {
-	char decrypt = 0;
-	unsigned char payload[129];
+	unsigned char payload[MAX_PACKET_LEN + 1];
 
-	switch ((SystemPacketType) packet->type) {
-	case SYS_TIMESTAMP:
-	case SYS_WEATHER:
-	case SYS_TRACK_STATUS:
-	case SYS_COMMENTARY:
-	case SYS_NOTICE:
-	case SYS_SPEED:
-		decrypt = 1;
-	}
-
-	move_payload (payload, m, packet, decrypt);
+	move_payload (payload, m, packet, is_crypted (packet));
 
 	switch ((SystemPacketType) packet->type) {
 		unsigned int number, i;

@@ -23,6 +23,9 @@
 #include <time.h>
 
 
+/* Maximal length of packet payload without terminal 0. */
+#define MAX_PACKET_LEN 127
+
 /**
  * CarPacketType:
  *
@@ -167,7 +170,7 @@ typedef struct {
 	int car, type, data, len;
 	time_t at;
 
-	unsigned char payload[128];
+	unsigned char payload[MAX_PACKET_LEN + 1];
 } Packet;
 
 #endif /* LIVE_F1_PACKETDEF_H */

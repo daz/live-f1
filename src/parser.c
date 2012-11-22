@@ -95,7 +95,7 @@ next_packet (struct evbuffer *input,
 	     Packet          *packet)
 {
 	struct evbuffer_iovec chain;
-	static unsigned char  pbuf[129];
+	static unsigned char  pbuf[MAX_PACKET_LEN + 2];
 	static size_t         pbuf_len = 0;
 
 	if (buffer_peekone (input, &chain) == 0)
