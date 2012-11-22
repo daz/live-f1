@@ -26,8 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "live-f1.h"
 #include "macros.h"
+#include "packetcache.h"
 
 /* file version signature */
 static const char *version_signature = "live-f1 version 2012.0 timing";
@@ -106,6 +106,10 @@ static int
 	/* capacity of @caches array */
 	caches_capacity = 0;
 
+/* System logger.
+ * First argument is event type, second argument is cache number,
+ * third argument is @type-dependent. */
+static void (* system_logger) (int, int, void *) = NULL;
 
 /**
  * get_file_size:
@@ -119,7 +123,8 @@ get_file_size (int cnum)
 {
 	long res;
 
-	info (5, _("get_file_size (cnum = %u)\n"), cnum);
+	if (system_logger)
+		system_logger (1, cnum, NULL);
 	assert ((cnum >= 0) && (cnum < caches_count));
 	if (fseek (caches[cnum].f, 0, SEEK_END) == -1)
 		return -1;
@@ -142,7 +147,8 @@ seek_func (int cnum, long packet_offset)
 {
 	size_t bytes = (packet_offset + 1) * sizeof (Packet);
 
-	info (5, _("seek_func (cnum = %u, packet_offset = %d)\n"), cnum, packet_offset);
+	if (system_logger)
+		system_logger (2, cnum, &packet_offset);
 	assert ((cnum >= 0) && (cnum < caches_count));
 	if (bytes / sizeof (Packet) != (packet_offset + 1))
 		return -1;
@@ -164,7 +170,8 @@ read_func (int cnum, Packet *dest, size_t packet_count)
 {
 	size_t bytes = packet_count * sizeof (Packet);
 
-	info (5, _("read_func (cnum = %u, packet_count = %u)\n"), cnum, packet_count);
+	if (system_logger)
+		system_logger (3, cnum, &packet_count);
 	assert ((cnum >= 0) && (cnum < caches_count));
 	assert (packet_count > 0);
 	assert (bytes / sizeof (Packet) == packet_count);
@@ -186,7 +193,8 @@ write_func (int cnum, Packet *src, size_t packet_count)
 {
 	size_t bytes = packet_count * sizeof (Packet);
 
-	info (5, _("write_func (cnum = %u, packet_count = %u)\n"), cnum, packet_count);
+	if (system_logger)
+		system_logger (4, cnum, &packet_count);
 	assert ((cnum >= 0) && (cnum < caches_count));
 	assert (packet_count > 0);
 	assert (bytes / sizeof (Packet) == packet_count);
@@ -473,6 +481,7 @@ copy_packet_iterator (PacketIterator *dst, const PacketIterator *src)
 		init_packet_iterator (src->cnum, dst);
 
 	*dst = *src;
+	return 0;
 }
 
 /**
@@ -939,4 +948,16 @@ set_new_underlying_file (int cnum, const char *name, char replay_mode, char fake
 			return res;
 	}
 	return load_final_packet (cnum);
+}
+
+/**
+ * set_packet_cache_system_logger:
+ * @logger: logger callback.
+ *
+ * Sets cache system logger (writes @logger to system_logger).
+ **/
+void
+set_packet_cache_system_logger (void (* logger) (int, int, void *))
+{
+	system_logger = logger;
 }

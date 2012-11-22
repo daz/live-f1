@@ -51,6 +51,7 @@
 
 
 /* Forward prototypes */
+static void info_packetcache (int, int, void *);
 static void print_version (void);
 static void print_usage (void);
 
@@ -526,6 +527,7 @@ main (int   argc,
 	print_version ();
 	printf ("\n");
 
+	set_packet_cache_system_logger (info_packetcache);
 	res = reader_create (&state.r, replay_mode);
 	switch (res) {
 	case 0:
@@ -563,6 +565,38 @@ main (int   argc,
 	model_destroy (&state.m);
 	reader_destroy (&state.r);
 	return res;
+}
+
+/**
+ * info_packetcache:
+ * @type: packet cache event type.
+ * @cnum: packet cache number.
+ * @arg: @type-dependent argument.
+ *
+ * Packet cache system logger.
+ * Translates calls to info.
+ **/
+static void
+info_packetcache (int type, int cnum, void *arg)
+{
+	switch (type) {
+	case 1:
+		info (5, _("get_file_size (cnum = %d)\n"),
+		      cnum);
+		break;
+	case 2:
+		info (5, _("seek_func (cnum = %d, packet_offset = %d)\n"),
+		      cnum, *((long *) arg));
+		break;
+	case 3:
+		info (5, _("read_func (cnum = %d, packet_count = %u)\n"),
+		      cnum, *((size_t *) arg));
+		break;
+	case 4:
+		info (5, _("write_func (cnum = %d, packet_count = %u)\n"),
+		      cnum, *((size_t *) arg));
+		break;
+	}
 }
 
 /**

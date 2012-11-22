@@ -75,6 +75,8 @@ void destroy_packet_cache (int cnum);
 
 int set_new_underlying_file (int cnum, const char *name, char replay_mode, char fake);
 
+void set_packet_cache_system_logger (void (* logger) (int, int, void *));
+
 SJR_END_EXTERN
 
 #endif /* LIVE_F1_PACKETCACHE_H */
