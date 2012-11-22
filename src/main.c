@@ -47,6 +47,7 @@
 #include "cfgfile.h"
 #include "display.h"
 #include "http.h"
+#include "packet.h"
 #include "stream.h"
 
 

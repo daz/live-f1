@@ -31,7 +31,8 @@ void decrypt_bytes           (unsigned int   decryption_key,
 			      unsigned char *buf,
 			      size_t         len);
 void reset_decryption        (unsigned int *salt);
-int  is_valid_decrypted_data (const Packet *packet, const char *payload);
+int  is_valid_decrypted_data (const Packet *packet,
+			      const unsigned char *payload);
 int  is_crypted              (const Packet *packet);
 
 SJR_END_EXTERN

@@ -237,7 +237,7 @@ outrefresh_all ()
 void
 clear_board (StateModel *m)
 {
-	int i, j;
+	int i;
 
 	open_display ();
 
@@ -677,14 +677,14 @@ _update_status (StateModel *m)
 		wattrset (statwin, attrs[COLOUR_RED_FLAG]);
 		draw_bar (statwin, 10);
 		break;
+	default:
+		break;
 	}
 	wmove (statwin, 3, 0);
 	wclrtoeol (statwin);
-	switch (m->flag) {
-	case SAFETY_CAR_DEPLOYED:
+	if (m->flag == SAFETY_CAR_DEPLOYED) {
 		wattrset (statwin, attrs[COLOUR_OLD]);
 		waddstr (statwin, "SAFETY CAR");
-		break;
 	}
 
 	/* Number of laps, or event type */

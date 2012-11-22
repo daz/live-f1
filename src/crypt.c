@@ -86,7 +86,7 @@ reset_decryption (unsigned int *salt)
  * Returns: 1 for successful checking result, 0 for decryption failure.
  **/
 int
-is_valid_decrypted_data (const Packet *packet, const char *payload)
+is_valid_decrypted_data (const Packet *packet, const unsigned char *payload)
 {
 	/* We use one-time regular expression compilation on demand */
 	static regex_t *re = NULL;
@@ -101,10 +101,15 @@ is_valid_decrypted_data (const Packet *packet, const char *payload)
 			re = malloc (sizeof (*re));
 			if (! re)
 				return 0;
+
+#if ((! defined MAX_CAR_NUMBER) || (MAX_CAR_NUMBER >= 100))
+	#error "Please define correct MAX_CAR_NUMBER and/or correct the regular expression below."
+#endif
+
 			regcomp(re, "^[1-9][0-9]?$|^$", REG_EXTENDED|REG_NOSUB);
 		}
 
-		if (regexec(re, payload, 0, NULL, 0) != 0)
+		if (regexec(re, (const char *) payload, 0, NULL, 0) != 0)
 			return 0;
 	}
 
@@ -134,8 +139,10 @@ is_crypted (const Packet *packet)
 		case SYS_NOTICE:
 		case SYS_SPEED:
 			return 1;
+		default:
+			return 0;
 		}
-	else
+	else if ((packet->car > 0) && (packet->car <= MAX_CAR_NUMBER))
 		return (CarPacketType) packet->type != CAR_POSITION_UPDATE;
 	return 0;
 }

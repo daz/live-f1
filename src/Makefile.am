@@ -2,7 +2,7 @@
 
 localedir = $(datadir)/locale
 AM_CPPFLAGS = \
-	-DLOCALEDIR="\"$(localedir)\"" -I$(top_srcdir)/intl \
+	-DLOCALEDIR="\"$(localedir)\"" -I$(top_srcdir)/intl -Wall \
 	$(LIBEVENT_CFLAGS)
 LDADD = $(LIBEVENT_LIBS)
 

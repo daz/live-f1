@@ -29,6 +29,7 @@
 
 #include "crypt.h"
 #include "display.h"
+#include "http.h"
 #include "packet.h"
 
 

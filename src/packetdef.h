@@ -25,6 +25,8 @@
 
 /* Maximal length of packet payload without terminal 0. */
 #define MAX_PACKET_LEN 127
+/* Maximal car number (Packet::car). */
+#define MAX_CAR_NUMBER 99
 
 /**
  * CarPacketType:
