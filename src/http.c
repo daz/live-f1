@@ -23,6 +23,7 @@
 # include <config.h>
 #endif /* HAVE_CONFIG_H */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -233,14 +234,46 @@ start_destroy_state_request (StateRequest *sr)
 	event_base_once (sr->r->base, -1, EV_TIMEOUT, do_destroy_state_request, sr, NULL);
 }
 
+//TODO: description
+static void
+start_pending_requests (StateReader *r, int mask)
+{
+	assert (r);
+
+	/* prevent key obtaining if cookie obtaining is in progress */
+	if (r->obtaining & OBTAINING_AUTH)
+		mask &= ~OBTAINING_KEY;
+
+	if (r->pending & mask & OBTAINING_AUTH)
+		start_get_auth_cookie (r);
+	if (r->pending & mask & OBTAINING_FRAME)
+		start_get_key_frame (r);
+	if (r->pending & mask & OBTAINING_KEY)
+		start_get_decryption_key (r);
+	if (r->pending & mask & OBTAINING_TOTALLAPS)
+		start_get_total_laps (r);
+	r->pending &= ~mask;
+}
+
+//TODO: description
+static void
+clear_obtaining_flag (StateReader *r, int flag)
+{
+	assert (r);
+
+	r->stop_handling_reason &= ~flag;
+	r->obtaining &= ~flag;
+	r->pending &= ~flag;
+}
+
 /**
  * do_get_auth_cookie:
  * @req: libevent's evhttp_request.
  * @arg: HTTP request structure.
  *
  * start_get_auth_cookie callback.
- * Retrieves authentication cookie from the response
- * and calls start_getaddrinfo on success response.
+ * Retrieves authentication cookie from the response.
+ * Initiates pending decryption key request on success response only.
  * Initiates getting authentication cookie again on error response.
  *
  * For convenience sake, the cookie is never unencoded.
@@ -252,13 +285,12 @@ do_get_auth_cookie (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->obtaining &= ~OBTAINING_AUTH;
-	sr->r->stop_handling_reason &= ~OBTAINING_AUTH;
+	clear_obtaining_flag (sr->r, OBTAINING_AUTH);
 
 	if (! is_valid_http_response_code (code))
-		fprintf (stderr, "%s: %s: %s %d\n", program_name,
-			 _("login request failed"),
-			 _("HTTP response code"), code);
+		info (0, "%s: %s: %s %d\n", program_name,
+		      _("login request failed"),
+		      _("HTTP response code"), code);
 	else {
 		const char *header = evhttp_find_header (evhttp_request_get_input_headers (req),
 		                                         "Set-Cookie");
@@ -270,12 +302,11 @@ do_get_auth_cookie (struct evhttp_request *req, void *arg)
 		start_get_auth_cookie (sr->r);
 	else if (sr->r->cookie) {
 		info (2, _("Authentication cookie obtained\n"));
-		start_getaddrinfo (sr->r);
-	} else {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("login failed: check email and password in ~/.f1rc"));
-		start_loopexit (sr->r->base);
-	}
+		start_pending_requests (sr->r, OBTAINING_KEY);
+	} else
+		info (0, "%s: %s\n", program_name,
+		      _("login failed: check email and password in ~/.f1rc"));
+	start_pending_requests (sr->r, OBTAINING_ALL & ~OBTAINING_KEY);
 }
 
 /**
@@ -312,12 +343,11 @@ start_get_auth_cookie (StateReader *r)
 
 	if (! email || ! password || evhttp_make_request (sr->conn, sr->req,
 				                          EVHTTP_REQ_POST, LOGIN_URL)) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("login request failed"));
+		info (0, "%s: %s\n", program_name,
+		      _("login request failed"));
 		destroy_state_request (sr);
 	} else {
 		r->obtaining |= OBTAINING_AUTH;
-		r->stop_handling_reason |= OBTAINING_AUTH;
 	}
 	free (password);
 	free (email);
@@ -443,8 +473,7 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 	int           success = 0;
 
 	start_destroy_state_request (sr);
-	sr->r->obtaining &= ~OBTAINING_KEY;
-	sr->r->stop_handling_reason &= ~OBTAINING_KEY;
+	clear_obtaining_flag (sr->r, OBTAINING_KEY);
 
 	if (is_valid_http_response_code (code)) {
 		StateRequestResult *res;
@@ -469,11 +498,12 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 			destroy_sr_result (res);
 		}
 	} else
-		fprintf (stderr, "%s: %s: %s %d\n", program_name,
-			 _("key request failed"),
-			 _("HTTP response code"), code);
+		info (0, "%s: %s: %s %d\n", program_name,
+		      _("key request failed"),
+		      _("HTTP response code"), code);
 	if (! success)
 		sr->r->key_request_failure = 1;
+	start_pending_requests (sr->r, OBTAINING_ALL);
 }
 
 /**
@@ -496,6 +526,10 @@ start_get_decryption_key (StateReader *r)
 
 	if (r->obtaining & OBTAINING_KEY)
 		return;
+	if (r->obtaining & OBTAINING_AUTH) {
+		r->pending |= OBTAINING_KEY;
+		return;
+	}
 
 	info (1, _("Obtaining decryption key ...\n"));
 
@@ -515,15 +549,14 @@ start_get_decryption_key (StateReader *r)
 		snprintf (url, len,
 		          "%s%u.asp?auth=%s", KEY_URL_BASE, evnt->no, r->cookie);
 
-	if (! url || evhttp_make_request (sr->conn, sr->req,
-				          EVHTTP_REQ_GET, url)) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("key request failed"));
+	r->key_request_failure = (! url) || evhttp_make_request (sr->conn, sr->req,
+								 EVHTTP_REQ_GET, url);
+	if (r->key_request_failure) {
+		info (0, "%s: %s\n", program_name,
+		      _("key request failed"));
 		destroy_state_request (sr);
-		r->key_request_failure = 1;
 	} else {
 		r->obtaining |= OBTAINING_KEY;
-		r->key_request_failure = 0;
 	}
 	free (url);
 }
@@ -573,18 +606,18 @@ do_get_key_frame (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->obtaining &= ~OBTAINING_FRAME;
-	sr->r->stop_handling_reason &= ~OBTAINING_FRAME;
+	clear_obtaining_flag (sr->r, OBTAINING_FRAME);
 
 	if (is_valid_http_response_code (code)) {
 		info (2, _("Key frame received\n"));
 		sr->r->frame = sr->r->new_frame;
 		read_stream (sr->r, evhttp_request_get_input_buffer (req), 1);
 	} else
-		fprintf (stderr, "%s: %s: %s %d\n", program_name,
-			 _("key frame request failed"),
-			 _("HTTP response code"), code);
+		info (0, "%s: %s: %s %d\n", program_name,
+		      _("key frame request failed"),
+		      _("HTTP response code"), code);
 	//TODO: try again on error ?
+	start_pending_requests (sr->r, OBTAINING_ALL);
 }
 
 /**
@@ -625,8 +658,8 @@ start_get_key_frame (StateReader *r)
 
 	if (! url || evhttp_make_request (sr->conn, sr->req,
 	                                  EVHTTP_REQ_GET, url)) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("key frame request failed"));
+		info (0, "%s: %s\n", program_name,
+		      _("key frame request failed"));
 		destroy_state_request (sr);
 	} else {
 		r->obtaining |= OBTAINING_FRAME;
@@ -653,8 +686,7 @@ do_get_total_laps (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->obtaining &= ~OBTAINING_TOTALLAPS;
-	sr->r->stop_handling_reason &= ~OBTAINING_TOTALLAPS;
+	clear_obtaining_flag (sr->r, OBTAINING_TOTALLAPS);
 
 	if (is_valid_http_response_code (code)) {
 		StateRequestResult *res;
@@ -679,10 +711,11 @@ do_get_total_laps (struct evhttp_request *req, void *arg)
 			destroy_sr_result (res);
 		}
 	} else
-		fprintf (stderr, "%s: %s: %s %d\n", program_name,
-			 _("total laps request failed"),
-			 _("HTTP response code"), code);
+		info (0, "%s: %s: %s %d\n", program_name,
+		      _("total laps request failed"),
+		      _("HTTP response code"), code);
 	//TODO: try again on error ?
+	start_pending_requests (sr->r, OBTAINING_ALL);
 }
 
 /**
@@ -708,8 +741,8 @@ start_get_total_laps (StateReader *r)
 
 	if (evhttp_make_request (sr->conn, sr->req,
 			         EVHTTP_REQ_GET, "/laps.php")) {
-		fprintf (stderr, "%s: %s\n", program_name,
-			 _("total laps request failed"));
+		info (0, "%s: %s\n", program_name,
+		      _("total laps request failed"));
 		destroy_state_request (sr);
 	} else
 		r->obtaining |= OBTAINING_TOTALLAPS;

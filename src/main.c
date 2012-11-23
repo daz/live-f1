@@ -475,9 +475,10 @@ start_periodic (CurrentState *state)
 static void
 start_reading_process (StateReader *r, StateModel *m)
 {
-	if (! r->replay_mode)
+	if (! r->replay_mode) {
 		start_get_auth_cookie (r);
-	else if (to_start_packet (&m->iter) == 0) {
+		start_getaddrinfo (r);
+	} else if (to_start_packet (&m->iter) == 0) {
 		const Packet *packet = get_packet (&m->iter);
 
 		if (packet) {

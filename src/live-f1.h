@@ -78,6 +78,7 @@ typedef enum {
 	OBTAINING_FRAME     = 4,
 	OBTAINING_KEY       = 8,
 	OBTAINING_TOTALLAPS = 16,
+	OBTAINING_ALL       = 31,
 	OBTAINING_LAST      = 32
 } ObtainingStatus;
 
@@ -124,6 +125,7 @@ typedef struct {
  * to @encrypted_cnum cache (see ObtainingStatus).
  * @obtaining: obtaining status (see ObtainingStatus), includes blocking
  * (stop_handling_reason) and non-blocking (other) obtainings.
+ * @pending: pending requests (see ObtainingStatus).
  * @saving_time: timestamp for parsing packets (packets received
  * from a key frame will get timestamp of this keyframe packet (@saving_time
  * freezes during querying key frame), packets received from the live timing
@@ -156,6 +158,8 @@ typedef struct {
 
 	int                               stop_handling_reason;
 	int                               obtaining;
+	int                               pending;
+
 	time_t                            saving_time;
 
 	unsigned int                      frame, new_frame;
