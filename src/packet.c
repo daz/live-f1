@@ -410,29 +410,36 @@ read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 
 //TODO: description
 int
-write_decryption_key (unsigned int decryption_key, StateReader *r)
+write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher)
 {
 	const Packet *oldp;
 	unsigned int old_key;
 	Packet p;
 	int i;
 
-	if ((! r) || (! decryption_key)) //TODO: if plaintext
+	if ((! r) || ((cipher == 1) && (! decryption_key)))
 		return -1;
 	oldp = get_packet (&r->key_iter);
 	if (! oldp)
 		return -1;
 	if (read_decryption_key (&old_key, oldp) == 0) {
-		if (old_key == decryption_key) {
+		int oldcipher = oldp->data >> 1;
+
+		if ((oldcipher == cipher) && (old_key == decryption_key)) {
 			info (5, _("Got equal decryption key (%08x)\n"),
 			      decryption_key);
-			return 0;
+			if (oldp->data & 1)
+				return 0;
+		} else if (oldcipher != cipher) {
+			info (0, _("Got different cipher type (old = %d, new = %d)\n"),
+			      oldcipher, cipher);
+		} else {
+			info (0, _("Got different decryption key (old = %08x, new = %08x)\n"),
+			      old_key, decryption_key);
 		}
-		info (0, _("Got different decryption key (old = %08x, new = %08x)\n"),
-		      old_key, decryption_key);
 	}
 	p = *oldp;
-	p.data = 3; //TODO: without magic numbers
+	p.data = (cipher << 1) | 1;
 	p.len = sizeof (decryption_key);
 	for (i = 0; i < p.len; ++i, decryption_key >>= 8)
 		p.payload[i] = decryption_key & 0xff;
@@ -714,13 +721,17 @@ pre_handle_packet (StateReader  *r,
                    const Packet *packet,
 		   char from_frame)
 {
-	int res = 0;
+	int res;
 
 	if ((! r) || (! packet))
 		return;
 	reverse_key (&r->key_rev, packet);
-	if ((r->key_rev.status == KR_STATUS_SUCCESS) &&
-	    (write_decryption_key (r->key_rev.key, r) == 0)) {
+	res = -1;
+	if (r->key_rev.status == KR_STATUS_SUCCESS)
+		res = write_decryption_key (r->key_rev.key, r, 1);
+	else if (r->key_rev.status == KR_STATUS_PLAINTEXT)
+		res = write_decryption_key (r->key_rev.key, r, 0);
+	if (res == 0) {
 		r->key_rev.status = KR_STATUS_LAST;
 		info (3, _("Decryption key (%08x) was reversed\n"),
 		      r->key_rev.key);

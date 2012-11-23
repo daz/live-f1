@@ -25,6 +25,8 @@
 
 
 #include <assert.h>
+#include <regex.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "crypt.h"
@@ -142,6 +144,7 @@ static void
 act_reverser (KeyReverser *krev, const Packet *p)
 {
 	static const char *start_phrase = "Please Wait ...";
+	static regex_t    *re = NULL;
 	size_t             count = 0;
 
 	assert (krev);
@@ -151,10 +154,23 @@ act_reverser (KeyReverser *krev, const Packet *p)
 		return;
 
 	count = MIN (p->len, MAX_PACKET_LEN);
-	if (krev->status == 0) {
-		if (p->car || (p->type != SYS_NOTICE) || (count != strlen (start_phrase)))
+	if (krev->status == KR_STATUS_START) {
+		if (! re) {
+			re = malloc (sizeof (*re));
+			if (! re) {
+				krev->status = KR_STATUS_FAILURE;
+				return;
+			}
+			regcomp(re, "^img:", REG_EXTENDED|REG_NOSUB);
+		}
+		if (p->car || (p->type != SYS_NOTICE))
 			krev->status = KR_STATUS_FAILURE;
-		else {
+		else if (count != strlen (start_phrase)) {
+			if (regexec(re, (const char *) p->payload, 0, NULL, 0) == 0)
+				krev->status = KR_STATUS_PLAINTEXT;
+			else
+				krev->status = KR_STATUS_FAILURE;
+		} else {
 			size_t i = 0;
 
 			if (krev->salt & 0x01) {
@@ -168,6 +184,9 @@ act_reverser (KeyReverser *krev, const Packet *p)
 				next_character (krev, p->payload[i] ^ start_phrase[i], 1);
 			if (krev->status == KR_STATUS_START)
 				krev->status = KR_STATUS_IN_PROGRESS;
+			else if ((krev->status == KR_STATUS_FAILURE) &&
+			         (regexec(re, (const char *) p->payload, 0, NULL, 0) == 0))
+				krev->status = KR_STATUS_PLAINTEXT;
 		}
 	} else if (krev->status == KR_STATUS_IN_PROGRESS) {
 		size_t i = 0;
@@ -177,6 +196,8 @@ act_reverser (KeyReverser *krev, const Packet *p)
 		for ( ; (i < count) && (krev->status == KR_STATUS_IN_PROGRESS); ++i, ++krev->pos)
 			next_character (krev, p->payload[i], 0);
 	}
+	if (krev->status == KR_STATUS_PLAINTEXT)
+		krev->key = 0;
 }
 
 /**

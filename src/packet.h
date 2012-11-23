@@ -30,7 +30,7 @@ void pre_handle_packet (StateReader *r, const Packet *packet, char from_frame);
 void handle_packet     (StateModel *m, const Packet *packet);
 void clear_model       (StateModel *m);
 
-int  write_decryption_key (unsigned int decryption_key, StateReader *r);
+int  write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher);
 
 SJR_END_EXTERN
 

@@ -489,9 +489,9 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 				parse_sr_result (&decryption_key, res, parse_hex_number);
 				info (3, _("Got decryption key: %08x\n"), decryption_key);
 				info (3, _("Begin new event #%d (type: %d)\n"),
-				      evnt->no, evnt->type);
+				      evnt->no, evnt->type); //TODO: to other place
 
-				write_decryption_key (decryption_key, sr->r); //TODO: check errors
+				write_decryption_key (decryption_key, sr->r, 1); //TODO: check errors
 				continue_pre_handle_stream (sr->r);
 				success = 1;
 			}
