@@ -530,6 +530,8 @@ start_get_decryption_key (StateReader *r)
 		r->pending |= OBTAINING_KEY;
 		return;
 	}
+	if (! r->cookie)
+		return;
 
 	info (1, _("Obtaining decryption key ...\n"));
 
