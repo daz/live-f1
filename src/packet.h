@@ -30,6 +30,8 @@ void pre_handle_packet (StateReader *r, const Packet *packet, char from_frame);
 void handle_packet     (StateModel *m, const Packet *packet);
 void clear_model       (StateModel *m);
 
+int  write_decryption_key (unsigned int decryption_key, StateReader *r);
+
 SJR_END_EXTERN
 
 #endif /* LIVE_F1_PACKET_H */

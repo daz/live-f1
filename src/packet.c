@@ -386,13 +386,14 @@ pre_handle_system_packet (StateReader  *r,
 	return 1;
 }
 
-static void
+//TODO: description
+static int
 read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 {
 	assert (decryption_key && packet);
 
 	if (packet->car || (packet->type != USER_SYS_KEY))
-		return;
+		return -1;
 	//TODO: without magic codes
 	if (packet->data == 1)
 		*decryption_key = 0;
@@ -403,8 +404,39 @@ read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 		for (i = packet->len; i; --i)
 			*decryption_key = (*decryption_key << 8) | packet->payload[i - 1];
 	} else
-		return;
-	info (3, _("Decryption key was loaded from stream buffer (%08x)\n"), *decryption_key);
+		return -1;
+	return 0;
+}
+
+//TODO: description
+int
+write_decryption_key (unsigned int decryption_key, StateReader *r)
+{
+	const Packet *oldp;
+	unsigned int old_key;
+	Packet p;
+	int i;
+
+	if ((! r) || (! decryption_key)) //TODO: if plaintext
+		return -1;
+	oldp = get_packet (&r->key_iter);
+	if (! oldp)
+		return -1;
+	if (read_decryption_key (&old_key, oldp) == 0) {
+		if (old_key == decryption_key) {
+			info (5, _("Got equal decryption key (%08x)\n"),
+			      decryption_key);
+			return 0;
+		}
+		info (0, _("Got different decryption key (old = %08x, new = %08x)\n"),
+		      old_key, decryption_key);
+	}
+	p = *oldp;
+	p.data = 3; //TODO: without magic numbers
+	p.len = sizeof (decryption_key);
+	for (i = 0; i < p.len; ++i, decryption_key >>= 8)
+		p.payload[i] = decryption_key & 0xff;
+	return write_packet (&r->key_iter, &p);
 }
 
 /**
@@ -652,7 +684,9 @@ handle_system_packet (StateModel   *m,
 		break;
 	case USER_SYS_KEY:
 		info (4, _("\thandle USER_SYS_KEY\n"));
-		read_decryption_key (&m->decryption_key, packet);
+		if (read_decryption_key (&m->decryption_key, packet) == 0)
+			info (3, _("Decryption key (%08x) was loaded from packet cache\n"),
+			      m->decryption_key);
 		break;
 	default:
 		/* Unhandled event */
@@ -684,6 +718,13 @@ pre_handle_packet (StateReader  *r,
 
 	if ((! r) || (! packet))
 		return;
+	reverse_key (&r->key_rev, packet);
+	if ((r->key_rev.status == KR_STATUS_SUCCESS) &&
+	    (write_decryption_key (r->key_rev.key, r) == 0)) {
+		r->key_rev.status = KR_STATUS_LAST;
+		info (3, _("Decryption key (%08x) was reversed\n"),
+		      r->key_rev.key);
+	}
 	if (packet->car)
 		res = pre_handle_car_packet (r, packet, from_frame);
 	else

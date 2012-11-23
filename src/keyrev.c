@@ -146,9 +146,8 @@ act_reverser (KeyReverser *krev, const Packet *p)
 
 	assert (krev);
 	assert (p);
-	if ((krev->status == KR_STATUS_FAILURE) ||
-	    (krev->status == KR_STATUS_SUCCESS) ||
-	    (p->len <= 0))
+	if ((p->len <= 0) ||
+	    ((krev->status != KR_STATUS_START) && (krev->status != KR_STATUS_IN_PROGRESS)))
 		return;
 
 	count = MIN (p->len, MAX_PACKET_LEN);

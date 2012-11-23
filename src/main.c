@@ -145,6 +145,7 @@ reader_create (StateReader *r, char replay_mode)
 				r->encrypted_cnum = init_packet_cache ();
 				if (r->encrypted_cnum >= 0) {
 					init_packet_iterator (r->encrypted_cnum, &r->key_iter);
+					reset_reverser (&r->key_rev);
 					return 0;
 				} else
 					res = 3;

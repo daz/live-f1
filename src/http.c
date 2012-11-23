@@ -252,7 +252,8 @@ do_get_auth_cookie (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_AUTH;
+	sr->r->obtaining &= ~OBTAINING_AUTH;
+	sr->r->stop_handling_reason &= ~OBTAINING_AUTH;
 
 	if (! is_valid_http_response_code (code))
 		fprintf (stderr, "%s: %s: %s %d\n", program_name,
@@ -291,7 +292,7 @@ start_get_auth_cookie (StateReader *r)
 	StateRequest *sr;
 	char         *email, *password;
 
-	if (r->stop_handling_reason & STOP_HANDLING_REASON_AUTH)
+	if (r->obtaining & OBTAINING_AUTH)
 		return;
 
 	info (1, _("Obtaining authentication cookie ...\n"));
@@ -314,8 +315,10 @@ start_get_auth_cookie (StateReader *r)
 		fprintf (stderr, "%s: %s\n", program_name,
 			 _("login request failed"));
 		destroy_state_request (sr);
-	} else
-		r->stop_handling_reason |= STOP_HANDLING_REASON_AUTH;
+	} else {
+		r->obtaining |= OBTAINING_AUTH;
+		r->stop_handling_reason |= OBTAINING_AUTH;
+	}
 	free (password);
 	free (email);
 }
@@ -423,29 +426,6 @@ parse_sr_result (unsigned int        *number,
 	*number = num;
 }
 
-//TODO: description
-static void
-write_decryption_key (StateReader *r, unsigned int decryption_key)
-{
-	const Packet *oldp;
-	Packet p;
-	int i;
-
-	if ((! r) || (! decryption_key))
-		return;
-	oldp = get_packet (&r->key_iter);
-	if (! oldp)
-		return;
-	p = *oldp;
-	p.data = 3; //TODO: without magic numbers
-	p.len = sizeof (decryption_key);
-	for (i = 0; i < p.len; ++i, decryption_key >>= 8)
-		p.payload[i] = decryption_key & 0xff;
-	write_packet (&r->key_iter, &p);
-	info (3, _("Decryption key was saved to stream buffer (0x%02x%02x%02x%02x)\n"),
-	      p.payload[0], p.payload[1], p.payload[2], p.payload[3]);
-}
-
 /**
  * do_get_decryption_key:
  * @req: libevent's evhttp_request.
@@ -463,8 +443,8 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 	int           success = 0;
 
 	start_destroy_state_request (sr);
-/*	sr->r->decryption_obtaining = 0; */
-	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_KEY;
+	sr->r->obtaining &= ~OBTAINING_KEY;
+	sr->r->stop_handling_reason &= ~OBTAINING_KEY;
 
 	if (is_valid_http_response_code (code)) {
 		StateRequestResult *res;
@@ -479,9 +459,10 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 
 				parse_sr_result (&decryption_key, res, parse_hex_number);
 				info (3, _("Got decryption key: %08x\n"), decryption_key);
-				info (3, _("Begin new event #%d (type: %d)\n"), evnt->no, evnt->type);
+				info (3, _("Begin new event #%d (type: %d)\n"),
+				      evnt->no, evnt->type);
 
-				write_decryption_key (sr->r, decryption_key);
+				write_decryption_key (decryption_key, sr->r); //TODO: check errors
 				continue_pre_handle_stream (sr->r);
 				success = 1;
 			}
@@ -513,8 +494,7 @@ start_get_decryption_key (StateReader *r)
 	size_t            len;
 	char             *url;
 
-/*	if (r->decryption_obtaining) */
-	if (r->stop_handling_reason & STOP_HANDLING_REASON_KEY)
+	if (r->obtaining & OBTAINING_KEY)
 		return;
 
 	info (1, _("Obtaining decryption key ...\n"));
@@ -542,8 +522,7 @@ start_get_decryption_key (StateReader *r)
 		destroy_state_request (sr);
 		r->key_request_failure = 1;
 	} else {
-/*		r->decryption_obtaining = 1; */
-		r->stop_handling_reason |= STOP_HANDLING_REASON_KEY;
+		r->obtaining |= OBTAINING_KEY;
 		r->key_request_failure = 0;
 	}
 	free (url);
@@ -594,7 +573,8 @@ do_get_key_frame (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_FRAME;
+	sr->r->obtaining &= ~OBTAINING_FRAME;
+	sr->r->stop_handling_reason &= ~OBTAINING_FRAME;
 
 	if (is_valid_http_response_code (code)) {
 		info (2, _("Key frame received\n"));
@@ -621,7 +601,7 @@ start_get_key_frame (StateReader *r)
 	size_t        len;
 	char         *url;
 
-	if (r->stop_handling_reason & STOP_HANDLING_REASON_FRAME)
+	if (r->obtaining & OBTAINING_FRAME)
 		return;
 
 	if (r->new_frame > 0)
@@ -648,8 +628,10 @@ start_get_key_frame (StateReader *r)
 		fprintf (stderr, "%s: %s\n", program_name,
 			 _("key frame request failed"));
 		destroy_state_request (sr);
-	} else
-		r->stop_handling_reason |= STOP_HANDLING_REASON_FRAME;
+	} else {
+		r->obtaining |= OBTAINING_FRAME;
+		r->stop_handling_reason |= OBTAINING_FRAME;
+	}
 	free (url);
 
 }
@@ -671,7 +653,8 @@ do_get_total_laps (struct evhttp_request *req, void *arg)
 	int           code = evhttp_request_get_response_code (req);
 
 	start_destroy_state_request (sr);
-	sr->r->stop_handling_reason &= ~STOP_HANDLING_REASON_TOTALLAPS;
+	sr->r->obtaining &= ~OBTAINING_TOTALLAPS;
+	sr->r->stop_handling_reason &= ~OBTAINING_TOTALLAPS;
 
 	if (is_valid_http_response_code (code)) {
 		StateRequestResult *res;
@@ -714,7 +697,7 @@ start_get_total_laps (StateReader *r)
 {
 	StateRequest *sr;
 
-	if (r->stop_handling_reason & STOP_HANDLING_REASON_TOTALLAPS)
+	if (r->obtaining & OBTAINING_TOTALLAPS)
 		return;
 
 	info (1, _("Obtaining total laps ...\n"));
@@ -729,7 +712,7 @@ start_get_total_laps (StateReader *r)
 			 _("total laps request failed"));
 		destroy_state_request (sr);
 	} else
-		r->stop_handling_reason |= STOP_HANDLING_REASON_TOTALLAPS;
+		r->obtaining |= OBTAINING_TOTALLAPS;
 }
 
 /**

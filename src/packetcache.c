@@ -804,7 +804,7 @@ save_packets (int cnum)
  *
  * Writes @packet to position under @it and to underlying file.
  * @it must be within [cache.start, cache.itpush) bounds.
- * Doesn't write @packet to memory if writing to file fails.
+ * Doesn't write @packet to memory if writing to file (if required) fails.
  *
  * Returns: 0 on success, < 0 on failure.
  **/
@@ -825,15 +825,12 @@ write_packet (const PacketIterator *it, const Packet *packet)
 		return err;
 	if ((it->index > ip->index) || ((it->index == ip->index) && (it->pos >= ip->pos)))
 		return cache_err_bound;
-	if ((it->index > iw->index) || ((it->index == iw->index) && (it->pos >= iw->pos)))
-		return 0;
-	if (seek_func (it->cnum, (long)(it->index - 1) * packet_chunk_size + it->pos) != 0)
+	if (((it->index < iw->index) || ((it->index == iw->index) && (it->pos < iw->pos))) &&
+	    ((seek_func  (it->cnum, (long)(it->index - 1) * packet_chunk_size + it->pos) != 0) ||
+	     (write_func (it->cnum, packet, 1) != 1)))
 		return cache_err_file;
-	if (write_func (it->cnum, packet, 1) == 1) {
-		caches[it->cnum].array[it->index].data[it->pos] = *packet;
-		return 0;
-	}
-	return cache_err_file;
+	caches[it->cnum].array[it->index].data[it->pos] = *packet;
+	return 0;
 }
 
 /**

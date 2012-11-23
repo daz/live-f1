@@ -33,7 +33,8 @@ typedef enum {
 	KR_STATUS_FAILURE	= -1,
 	KR_STATUS_START		=  0,
 	KR_STATUS_IN_PROGRESS	=  1,
-	KR_STATUS_SUCCESS	=  2
+	KR_STATUS_SUCCESS	=  2,
+	KR_STATUS_LAST          =  3
 } KeyReversingStatus;
 
 /**

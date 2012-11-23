@@ -27,6 +27,7 @@
 #include <event2/event.h>
 #include <event2/util.h>
 
+#include "keyrev.h"
 #include "macros.h"
 #include "packetcache.h"
 
@@ -66,19 +67,19 @@ typedef enum {
 } FlagStatus;
 
 /**
- * StopHandlingReason:
+ * ObtainingStatus:
  *
- * Reason of stopping moving packets from one cache to another.
- * Moving process stops when we wait for receiving data
- * from other source than live timing server.
+ * These flags indicate obtaining data from other source than
+ * live timing server.
  **/
 typedef enum {
-	STOP_HANDLING_REASON_AUTH      = 1,
-	STOP_HANDLING_REASON_CONNECT   = 2, /*reserved*/
-	STOP_HANDLING_REASON_FRAME     = 4,
-	STOP_HANDLING_REASON_KEY       = 8,  //TODO: will be non-blocked
-	STOP_HANDLING_REASON_TOTALLAPS = 16
-} StopHandlingReason;
+	OBTAINING_AUTH      = 1,
+	OBTAINING_CONNECT   = 2, /* reserved */
+	OBTAINING_FRAME     = 4,
+	OBTAINING_KEY       = 8,
+	OBTAINING_TOTALLAPS = 16,
+	OBTAINING_LAST      = 32
+} ObtainingStatus;
 
 /**
  * CarAtom:
@@ -110,6 +111,7 @@ typedef struct {
  * received either from the data server or a key frame.
  * @key_iter: iterator pointed to USER_SYS_KEY packet
  * (in @encrypted_cnum cache) to save received or reversed decryption key to.
+ * @key_rev: key reversing state structure.
  * @key_request_failure: true if last key request has failed.
  *
  * @host: hostname to contact.
@@ -119,7 +121,9 @@ typedef struct {
  * @password: user's password.
  * @cookie: user's authorisation cookie.
  * @stop_handling_reason: reason of suspension of moving from @input_cnum
- * to @encrypted_cnum cache (see StopHandlingReason).
+ * to @encrypted_cnum cache (see ObtainingStatus).
+ * @obtaining: obtaining status (see ObtainingStatus), includes blocking
+ * (stop_handling_reason) and non-blocking (other) obtainings.
  * @saving_time: timestamp for parsing packets (packets received
  * from a key frame will get timestamp of this keyframe packet (@saving_time
  * freezes during querying key frame), packets received from the live timing
@@ -143,14 +147,15 @@ typedef struct {
 	int                               input_cnum;
 	int                               encrypted_cnum;
 	PacketIterator                    key_iter;
+	KeyReverser                       key_rev;
 	char                              key_request_failure; /*bool*/
 
 	char                             *host, *auth_host;
 	unsigned int                      port;
 	char                             *email, *password, *cookie;
-//TODO:	char                              decryption_obtaining; /*bool*/
 
 	int                               stop_handling_reason;
+	int                               obtaining;
 	time_t                            saving_time;
 
 	unsigned int                      frame, new_frame;
