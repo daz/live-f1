@@ -53,8 +53,9 @@ static void start_open_stream ();
 static void
 clear_reader (StateReader *r)
 {
-	r->decryption_key = 0;
-	r->decryption_failure = 0;
+	destroy_packet_iterator (&r->key_iter);
+	init_packet_iterator (r->encrypted_cnum, &r->key_iter);
+	r->key_request_failure = 0;
 	r->frame = 0;
 }
 

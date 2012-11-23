@@ -38,6 +38,10 @@
 #define PACKETCACHE_ERR_OVERFLOW -4
 /* invalid cache number */
 #define PACKETCACHE_ERR_CNUM     -5
+/* iterator goes out of bounds */
+#define PACKETCACHE_ERR_BOUND    -6
+/* non-used */
+#define PACKETCACHE_ERR_LAST     -7
 
 
 /**
@@ -62,11 +66,13 @@ void destroy_packet_iterator (PacketIterator *it);
 int  copy_packet_iterator    (PacketIterator *dst, const PacketIterator *src);
 
 int to_start_packet (PacketIterator *it);
+int to_end_packet   (PacketIterator *it);
 int to_next_packet  (PacketIterator *it);
 
 int            push_packet      (int cnum, const Packet *packet);
 const Packet * get_packet       (PacketIterator *it);
 int            save_packets     (int cnum);
+int            write_packet     (const PacketIterator *it, const Packet *packet);
 const Packet * get_head_packet  (int cnum);
 int            drop_head_packet (int cnum);
 

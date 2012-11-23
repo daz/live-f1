@@ -22,13 +22,43 @@
 
 #include "macros.h"
 #include "packetdef.h"
-/*#include "packetcache.h"*/
+
+
+/**
+ * KeyReversingStatus:
+ *
+ * Status of key reversing.
+ **/
+typedef enum {
+	KR_STATUS_FAILURE	= -1,
+	KR_STATUS_START		=  0,
+	KR_STATUS_IN_PROGRESS	=  1,
+	KR_STATUS_SUCCESS	=  2
+} KeyReversingStatus;
+
+/**
+ * KeyReverser:
+ * @key: current key approximation.
+ * @salt: current salt approximation.
+ * @mask: known bits in @key.
+ * @status: key reversing status.
+ * @pos: current count of scanned characters in encrypted stream.
+ *
+ * Holds key reversing state.
+ **/
+typedef struct {
+	unsigned int       key;
+	unsigned int       salt;
+	unsigned int       mask;
+	KeyReversingStatus status;
+	size_t             pos;
+} KeyReverser;
 
 
 SJR_BEGIN_EXTERN
 
-int reverse_key (unsigned int *key, const Packet *p);
-/*int reverse_key (unsigned int *key, PacketIterator *from, const PacketIterator *to);*/
+void reset_reverser (KeyReverser *krev);
+void reverse_key    (KeyReverser *krev, const Packet *p);
 
 SJR_END_EXTERN
 

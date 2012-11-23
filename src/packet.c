@@ -24,6 +24,7 @@
 #endif /* HAVE_CONFIG_H */
 
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,20 +48,25 @@
 static void
 move_payload (unsigned char *res, StateModel *m, const Packet *packet, char decrypt)
 {
-	int len = MAX (0, packet->len);
+	int len;
 
+	assert (res && m && packet);
+
+	len = MAX (0, packet->len);
 	len = MIN (len, MAX_PACKET_LEN);
-	if (len > 0) {
+	if (len > 0)
 		memcpy (res, packet->payload, len);
-		if (decrypt) {
-			decrypt_bytes (m->r->decryption_key, &m->salt, res, len);
-			if (! is_valid_decrypted_data (packet, res)) {
-				info (3, _("Decryption failure\n"));
-				m->r->decryption_failure = 1;
-			}
+	res[len] = 0;
+	if ((len > 0) && decrypt) {
+		decrypt_bytes (m->decryption_key, &m->salt, res, len);
+		if (! is_valid_decrypted_data (packet, res)) {
+			info (3, _("Decryption failure (car = %d, type = %d, "
+			      "data = %d, len = %d, payload = \"%s\")\n"),
+			      packet->car, packet->type, packet->data, packet->len,
+			      (const char *) res);
+			m->decryption_failure = 1;
 		}
 	}
-	res[len] = 0;
 }
 
 /**
@@ -79,6 +85,8 @@ pre_handle_car_packet (StateReader  *r,
 		       const Packet *packet,
 		       char from_frame)
 {
+	assert (r && packet);
+
 	switch ((CarPacketType) packet->type) {
 	case CAR_POSITION_UPDATE:
 		info (4, _("\tgot CAR_POSITION_UPDATE\n"));
@@ -106,6 +114,8 @@ handle_car_packet (StateModel   *m,
 		   const Packet *packet)
 {
 	unsigned char payload[MAX_PACKET_LEN + 1];
+
+	assert (m && packet);
 
 	move_payload (payload, m, packet, is_crypted (packet));
 
@@ -221,6 +231,9 @@ handle_car_packet (StateModel   *m,
 void
 clear_model (StateModel *m)
 {
+	if (! m)
+		return;
+
 	m->remaining_time = 0;
 	m->epoch_time = 0;
 	m->laps_completed = 0;
@@ -278,9 +291,10 @@ pre_handle_system_packet (StateReader  *r,
 		          const Packet *packet,
 			  char from_frame)
 {
+	assert (r && packet);
+
 	switch ((SystemPacketType) packet->type) {
 		unsigned int number, i;
-		char decryption_failure;
 
 	case SYS_EVENT_ID:
 		/* Event Start:
@@ -291,6 +305,16 @@ pre_handle_system_packet (StateReader  *r,
 		 * obtain the decryption key for the event.
 		 */
 		info (4, _("\tgot SYS_EVENT_ID\n"));
+		{
+			Packet kp;
+			kp.car = 0;
+			kp.type = USER_SYS_KEY;
+			kp.data = 0;
+			kp.len = 0;
+			kp.at = r->saving_time;
+			to_end_packet (&r->key_iter); //TODO: old key_iter
+			push_packet (r->encrypted_cnum, &kp); //TODO: check errors
+		}
 		number = 0;
 		for (i = 1; i < packet->len; i++) {
 			number *= 10;
@@ -318,13 +342,10 @@ pre_handle_system_packet (StateReader  *r,
 			number |= packet->payload[--i];
 		}
 
-		decryption_failure = r->decryption_failure;
 		/* Decryption key should be obtained only after key frame
 		 * receiving. Server returns null key otherwise.
 		 */
-//		if ((! r->decryption_key) || decryption_failure)
-//			start_get_decryption_key (r);
-		if ((! r->frame) || decryption_failure) {
+		if (! r->frame) {
 			r->new_frame = number;
 			start_get_key_frame (r);
 		} else
@@ -365,6 +386,27 @@ pre_handle_system_packet (StateReader  *r,
 	return 1;
 }
 
+static void
+read_decryption_key (unsigned int *decryption_key, const Packet *packet)
+{
+	assert (decryption_key && packet);
+
+	if (packet->car || (packet->type != USER_SYS_KEY))
+		return;
+	//TODO: without magic codes
+	if (packet->data == 1)
+		*decryption_key = 0;
+	else if (packet->data == 3) {
+		int i;
+
+		*decryption_key = 0;
+		for (i = packet->len; i; --i)
+			*decryption_key = (*decryption_key << 8) | packet->payload[i - 1];
+	} else
+		return;
+	info (3, _("Decryption key was loaded from stream buffer (%08x)\n"), *decryption_key);
+}
+
 /**
  * handle_system_packet:
  * @m: model structure.
@@ -377,6 +419,8 @@ handle_system_packet (StateModel   *m,
 		      const Packet *packet)
 {
 	unsigned char payload[MAX_PACKET_LEN + 1];
+
+	assert (m && packet);
 
 	move_payload (payload, m, packet, is_crypted (packet));
 
@@ -606,6 +650,10 @@ handle_system_packet (StateModel   *m,
 		info (4, _("\thandle USER_SYS_TOTAL_LAPS\n"));
 		m->total_laps = packet->data;
 		break;
+	case USER_SYS_KEY:
+		info (4, _("\thandle USER_SYS_KEY\n"));
+		read_decryption_key (&m->decryption_key, packet);
+		break;
 	default:
 		/* Unhandled event */
 		info (4, _("\thandle unknown system packet (type = %d)\n"),
@@ -634,6 +682,8 @@ pre_handle_packet (StateReader  *r,
 {
 	int res = 0;
 
+	if ((! r) || (! packet))
+		return;
 	if (packet->car)
 		res = pre_handle_car_packet (r, packet, from_frame);
 	else
@@ -656,6 +706,8 @@ void
 handle_packet (StateModel   *m,
                const Packet *packet)
 {
+	if ((! m) || (! packet))
+		return;
 	if (packet->car)
 		handle_car_packet (m, packet);
 	else

@@ -25,34 +25,38 @@
 
 
 #include <assert.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "crypt.h"
 #include "keyrev.h"
 
 
-typedef struct {
-	unsigned int  key;
-	unsigned int  salt;
-	unsigned int  mask;
-	int           status;
-	size_t        pos;
-} KeyReverser;
-
-
-static void
+/**
+ * reset_reverser:
+ * @krev: key reverser state.
+ *
+ * Resets @krev.
+ **/
+void
 reset_reverser (KeyReverser *krev)
 {
-	assert (krev);
+	if (! krev)
+		return;
 	krev->key = 0x80000000;
 	reset_decryption (&krev->salt);
 	krev->mask = 0;
-	krev->status = 0;
+	krev->status = KR_STATUS_START;
 	krev->pos = 0;
 }
 
-static int
+/**
+ * replay_reverser:
+ * @krev: key reverser state.
+ *
+ * Replays @krev->salt for @krev->pos characters
+ * if @krev->key approximation was corrected.
+ **/
+static void
 replay_reverser (KeyReverser *krev)
 {
 	size_t i;
@@ -61,27 +65,41 @@ replay_reverser (KeyReverser *krev)
 	reset_decryption (&krev->salt);
 	for (i = 0; i <= krev->pos; ++i)
 		krev->salt = (krev->salt >> 1) ^ (krev->salt & 0x01 ? krev->key : 0);
-	return 0;
 }
 
+/**
+ * first_character:
+ * @krev: key reverser state.
+ * @diff: XOR difference between first encrypted character and
+ * first known-plaintext character.
+ *
+ * Makes first @krev->key and @krev->salt approximation
+ * (8 least significant bits).
+ **/
 static void
 first_character (KeyReverser *krev, unsigned char diff)
 {
 	assert (krev);
 	assert (krev->salt & 0x01);
 	krev->salt >>= 1;
-	krev->key = diff ^ krev->salt;
+	krev->key = diff ^ krev->salt ^ krev->key;
 	krev->mask = 0xff;
 	krev->salt = krev->salt ^ krev->key;
 }
 
-#if ((! defined MAX_CAR_NUMBER) || (MAX_CAR_NUMBER >= 128))
-	#error "If MAX_CAR_NUMBER >= 128 then msb can be equal to 1 in some car packets."
-#endif
-/* Reversing method bases on the fact that every decrypted symbol
+/**
+ * next_character:
+ * @krev: key reverser state.
+ * @diff: XOR difference between encrypted character and
+ * known-plaintext character.
+ * @strict: make strict checking.
+ *
+ * Reversing method bases on the fact that every decrypted symbol
  * has zero most significant bit (except SYS_TIMESTAMP payload and
  * some characters in SYS_COMMENTARY payload).
- */
+ * If @strict == 0 then this function ignores all bits in @diff except msb,
+ * otherwise strict checking is maked.
+ **/
 static void
 next_character (KeyReverser *krev, unsigned char diff, char strict)
 {
@@ -93,42 +111,50 @@ next_character (KeyReverser *krev, unsigned char diff, char strict)
 	if (last)
 		krev->salt = krev->salt ^ krev->key;
 	if (strict && ((diff & 0x7f) != (krev->salt & 0x7f))) {
-		krev->status = -1;
+		krev->status = KR_STATUS_FAILURE;
 		return;
 	}
 	if ((diff & 0x80) != (krev->salt & 0x80)) {
 		krev->key = krev->key ^ (krev->mask + 1);
-		if (replay_reverser (krev) != 0) {
-			krev->status = -1;
-			return;
-		}
+		replay_reverser (krev);
 	}
 	if ((diff & 0x80) != (krev->salt & 0x80)) {
-		krev->status = -1;
+		krev->status = KR_STATUS_FAILURE;
 		return;
 	}
 	krev->mask = (krev->mask << 1) | 0x01;
-	if ((krev->mask + 1) == 0)
-		krev->status = 2;
+	if ((krev->mask & krev->key) == krev->key)
+		krev->status = KR_STATUS_SUCCESS;
 }
 
-static int
+#if ((! defined MAX_CAR_NUMBER) || (MAX_CAR_NUMBER >= 128))
+	#error "If MAX_CAR_NUMBER >= 128 then msb can be equal to 1 in some car packets."
+#endif
+
+/**
+ * act_reverser:
+ * @krev: key reverser state.
+ * @p: current packet.
+ *
+ * Makes real reversing action.
+ **/
+static void
 act_reverser (KeyReverser *krev, const Packet *p)
 {
 	static const char *start_phrase = "Please Wait ...";
-	static size_t      splen = 0;
 	size_t             count = 0;
 
 	assert (krev);
 	assert (p);
-	if (! splen)
-		splen = strlen (start_phrase);
-	if ((krev->status < 0) || (krev->status > 1) || (p->len <= 0))
-		return krev->status;
+	if ((krev->status == KR_STATUS_FAILURE) ||
+	    (krev->status == KR_STATUS_SUCCESS) ||
+	    (p->len <= 0))
+		return;
+
 	count = MIN (p->len, MAX_PACKET_LEN);
 	if (krev->status == 0) {
-		if (p->car || (p->type != SYS_NOTICE) || (p->len != splen))
-			krev->status = -1;
+		if (p->car || (p->type != SYS_NOTICE) || (count != strlen (start_phrase)))
+			krev->status = KR_STATUS_FAILURE;
 		else {
 			size_t i = 0;
 
@@ -137,102 +163,38 @@ act_reverser (KeyReverser *krev, const Packet *p)
 				++i;
 				++krev->pos;
 			} else
-				krev->status = -1; //TODO: implement this variant ?
-			for ( ; (i < count) && (krev->status == 0); ++i, ++krev->pos)
+				//TODO: implement this variant ?
+				krev->status = KR_STATUS_FAILURE;
+			for ( ; (i < count) && (krev->status == KR_STATUS_START); ++i, ++krev->pos)
 				next_character (krev, p->payload[i] ^ start_phrase[i], 1);
-			if (krev->status == 0)
-				krev->status = 1;
+			if (krev->status == KR_STATUS_START)
+				krev->status = KR_STATUS_IN_PROGRESS;
 		}
-	} else if (krev->status == 1) {
-		size_t i;
+	} else if (krev->status == KR_STATUS_IN_PROGRESS) {
+		size_t i = 0;
 
 		if ((! p->car) && ((p->type == SYS_COMMENTARY) || (p->type == SYS_NOTICE)))
-			krev->status = -1;
-		for (i = 0; (i < count) && (krev->status == 1); ++i, ++krev->pos)
+			krev->status = KR_STATUS_FAILURE;
+		for ( ; (i < count) && (krev->status == KR_STATUS_IN_PROGRESS); ++i, ++krev->pos)
 			next_character (krev, p->payload[i], 0);
 	}
-
-	return krev->status;
 }
 
 /**
  * reverse_key:
- * @key: pointer to save newly reversed key.
- * @p: next packet in packet stream.
+ * @krev: key reverser state.
+ * @p: current packet in packet stream.
  *
  * Tries to reverse key from packet stream.
- * This function saves state between calls.
- *
- * Returns: 0 on success, < 0 on failure,
- * 1 if key was not reversed (not enough data).
+ * This function saves state in @krev.
  **/
-int
-reverse_key (unsigned int *key, const Packet *p)
+void
+reverse_key (KeyReverser *krev, const Packet *p)
 {
-	static KeyReverser *krev = NULL;
-
-	if ((! key) || (! p))
-		return -1;
-	if (! krev) {
-		krev = malloc (sizeof (*krev));
-		if (! krev)
-			return -1;
-		reset_reverser (krev);
-	}
-
+	if ((! krev) || (! p))
+		return;
 	if (is_reset_decryption_packet (p))
 		reset_reverser (krev);
-	if (is_crypted (p) && (act_reverser (krev, p) == 2)) {
-		*key = krev->key;
-		return 0;
-	}
-
-	return 1;
+	if (is_crypted (p))
+		act_reverser (krev, p);
 }
-
-/*
- * @from: start iterator to collect data from.
- * @to: final iterator to collect data from.
- *
- * Iterator @from can be changed during this function execution.
- *
-int
-reverse_key (unsigned int *key, PacketIterator *from, const PacketIterator *to)
-{
-	PacketIterator it;
-	KeyReverser krev;
-	int res = 1;
-
-	if ((! key) || (! from) || (! to) || (from->cnum != to->cnum))
-		return -1;
-	init_packet_iterator (from->cnum, &it);
-	if (copy_packet_iterator (&it, from) != 0)
-		res = -1;
-	reset_reverser (&krev);
-
-	while ((res >= 0) && (it != *to)) {
-		const Packet *packet = get_packet (&it);
-
-		res = -1;
-		if (! packet)
-			break;
-		if (is_reset_decryption_packet (packet)) {
-			if (copy_packet_iterator (from, &it) != 0)
-				break;
-			reset_reverser (&krev);
-		}
-		if (is_crypted (packet) && (act_reverser (&krev, packet) == 2)) {
-			res = 0;
-			break;
-		}
-		if (to_next_packet (&it) != 0)
-			break;
-		res = 1;
-	}
-
-	if (res == 0)
-		*key = krev.key;
-	destroy_packet_iterator (&it);
-	return res;
-}
-*/

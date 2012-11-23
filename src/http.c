@@ -423,6 +423,29 @@ parse_sr_result (unsigned int        *number,
 	*number = num;
 }
 
+//TODO: description
+static void
+write_decryption_key (StateReader *r, unsigned int decryption_key)
+{
+	const Packet *oldp;
+	Packet p;
+	int i;
+
+	if ((! r) || (! decryption_key))
+		return;
+	oldp = get_packet (&r->key_iter);
+	if (! oldp)
+		return;
+	p = *oldp;
+	p.data = 3; //TODO: without magic numbers
+	p.len = sizeof (decryption_key);
+	for (i = 0; i < p.len; ++i, decryption_key >>= 8)
+		p.payload[i] = decryption_key & 0xff;
+	write_packet (&r->key_iter, &p);
+	info (3, _("Decryption key was saved to stream buffer (0x%02x%02x%02x%02x)\n"),
+	      p.payload[0], p.payload[1], p.payload[2], p.payload[3]);
+}
+
 /**
  * do_get_decryption_key:
  * @req: libevent's evhttp_request.
@@ -452,11 +475,13 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 			EventNumTypePair *evnt = res->userdata;
 
 			if (evnt) {
-				parse_sr_result (&sr->r->decryption_key, res, parse_hex_number);
-				info (3, _("Got decryption key: %08x\n"), sr->r->decryption_key);
+				unsigned int decryption_key;
+
+				parse_sr_result (&decryption_key, res, parse_hex_number);
+				info (3, _("Got decryption key: %08x\n"), decryption_key);
 				info (3, _("Begin new event #%d (type: %d)\n"), evnt->no, evnt->type);
 
-				sr->r->decryption_failure = 0;
+				write_decryption_key (sr->r, decryption_key);
 				continue_pre_handle_stream (sr->r);
 				success = 1;
 			}
@@ -467,7 +492,7 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 			 _("key request failed"),
 			 _("HTTP response code"), code);
 	if (! success)
-		sr->r->decryption_failure = 1;
+		sr->r->key_request_failure = 1;
 }
 
 /**
@@ -515,10 +540,12 @@ start_get_decryption_key (StateReader *r)
 		fprintf (stderr, "%s: %s\n", program_name,
 			 _("key request failed"));
 		destroy_state_request (sr);
-		r->decryption_failure = 1;
-	} else
+		r->key_request_failure = 1;
+	} else {
 /*		r->decryption_obtaining = 1; */
 		r->stop_handling_reason |= STOP_HANDLING_REASON_KEY;
+		r->key_request_failure = 0;
+	}
 	free (url);
 }
 

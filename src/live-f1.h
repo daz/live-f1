@@ -108,6 +108,9 @@ typedef struct {
  * the data server.
  * @encrypted_cnum: number of packet cache containing encrypted data
  * received either from the data server or a key frame.
+ * @key_iter: iterator pointed to USER_SYS_KEY packet
+ * (in @encrypted_cnum cache) to save received or reversed decryption key to.
+ * @key_request_failure: true if last key request has failed.
  *
  * @host: hostname to contact.
  * @auth_host: authorisation host to contact.
@@ -115,8 +118,6 @@ typedef struct {
  * @email: user's e-mail address.
  * @password: user's password.
  * @cookie: user's authorisation cookie.
- * @decryption_key: decryption key.
- * @decryption_failure: indicates if payload decryption has failed.
  * @stop_handling_reason: reason of suspension of moving from @input_cnum
  * to @encrypted_cnum cache (see StopHandlingReason).
  * @saving_time: timestamp for parsing packets (packets received
@@ -141,13 +142,13 @@ typedef struct {
 	struct event                     *periodic;
 	int                               input_cnum;
 	int                               encrypted_cnum;
+	PacketIterator                    key_iter;
+	char                              key_request_failure; /*bool*/
 
 	char                             *host, *auth_host;
 	unsigned int                      port;
 	char                             *email, *password, *cookie;
-	unsigned int                      decryption_key;
 //TODO:	char                              decryption_obtaining; /*bool*/
-	char                              decryption_failure; /*bool*/
 
 	int                               stop_handling_reason;
 	time_t                            saving_time;
@@ -160,9 +161,11 @@ typedef struct {
 
 /**
  * StateModel:
- * @r: pointer to associated StateReader.
- * @iter: iterator pointed to current packet in the @r->encrypted_cnum cache.
+ * @iter: iterator pointed to current packet in the
+ * StateReader::encrypted_cnum cache.
+ * @decryption_key: current decryption key.
  * @salt: current decryption salt.
+ * @decryption_failure: indicates if payload decryption has failed.
  * @event_type: current event type (practice/qualifying/race).
  * @paused: indicates whether visualization is paused.
  * @replay_gap: time gap between starting time of saving the replay
@@ -193,12 +196,12 @@ typedef struct {
  * @car_position: current position of each car.
  * @car_info: arrays of information about each car.
  *
- * Model structure used for visualization.
+ * Model structure used for decryption and visualization.
  **/
 typedef struct {
-	StateReader       *r;
 	PacketIterator     iter;
-	unsigned int       salt;
+	unsigned int       decryption_key, salt;
+	char               decryption_failure; /*bool*/
 
 	EventType          event_type;
 

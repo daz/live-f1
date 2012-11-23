@@ -29,6 +29,7 @@
 		getopt ((argc), (argv), (optstring))
 #endif /* HAVE_GETOPT_H */
 
+#include <assert.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -142,9 +143,10 @@ reader_create (StateReader *r, char replay_mode)
 			r->input_cnum = init_packet_cache ();
 			if (r->input_cnum >= 0) {
 				r->encrypted_cnum = init_packet_cache ();
-				if (r->encrypted_cnum >= 0)
+				if (r->encrypted_cnum >= 0) {
+					init_packet_iterator (r->encrypted_cnum, &r->key_iter);
 					return 0;
-				else
+				} else
 					res = 3;
 			} else
 				res = 3;
@@ -186,7 +188,6 @@ model_create (StateModel *m, StateReader *r)
 
 	memset (m, 0, sizeof (*m));
 
-	m->r = r;
 	init_packet_iterator (r->encrypted_cnum, &m->iter);
 	m->event_type = RACE_EVENT;
 	clear_model (m);
@@ -384,6 +385,19 @@ save_data (StateReader *r)
 		         strerror (errno));
 }
 
+//TODO: description
+static int
+wait_for_decryption_key (StateModel *m, const Packet *packet)
+{
+	assert (m);
+	assert (packet);
+
+	if (packet->car || (packet->type != USER_SYS_KEY))
+		return 1;
+	//TODO: without magic codes
+	return (packet->data == 1) || (packet->data == 3);
+}
+
 /**
  * do_periodic:
  * @arg: application state structure.
@@ -412,7 +426,7 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 
 	while (((packet = get_packet (&state->m.iter)) != NULL) &&
 	       (packet->at <= state->m.model_time) &&
-	       (state->r.decryption_key)) {
+	       wait_for_decryption_key (&state->m, packet)) {
 		PacketIterator it;
 		Packet pc;
 

@@ -41,15 +41,19 @@ static const size_t min_chunks_cache_size = 4;
 /* Packet cache error codes */
 static const int
 	/* file operation fails */
-	cache_err_file     = PACKETCACHE_ERR_FILE,
+	cache_err_file		= PACKETCACHE_ERR_FILE,
 	/* unsupported underlying file version */
-	cache_err_version  = PACKETCACHE_ERR_VERSION,
+	cache_err_version	= PACKETCACHE_ERR_VERSION,
 	/* not enough memory */
-	cache_err_nomem    = PACKETCACHE_ERR_NOMEM,
+	cache_err_nomem		= PACKETCACHE_ERR_NOMEM,
 	/* integer overflow */
-	cache_err_overflow = PACKETCACHE_ERR_OVERFLOW,
+	cache_err_overflow	= PACKETCACHE_ERR_OVERFLOW,
 	/* invalid cache number */
-	cache_err_cnum     = PACKETCACHE_ERR_CNUM;
+	cache_err_cnum		= PACKETCACHE_ERR_CNUM,
+	/* iterator goes is out of bounds */
+	cache_err_bound		= PACKETCACHE_ERR_BOUND,
+	/* non-used */
+	cache_err_last		= PACKETCACHE_ERR_LAST;
 
 
 /* chunk smart pointer */
@@ -189,7 +193,7 @@ read_func (int cnum, Packet *dest, size_t packet_count)
  * Returns: count of packets were written.
  **/
 static size_t
-write_func (int cnum, Packet *src, size_t packet_count)
+write_func (int cnum, const Packet *src, size_t packet_count)
 {
 	size_t bytes = packet_count * sizeof (Packet);
 
@@ -423,6 +427,7 @@ change_chunk (int cnum, size_t newindex, size_t oldindex)
  * @it: packet iterator.
  *
  * Initialises @it.
+ * Must be executed before any using of PacketIterator.
  **/
 void
 init_packet_iterator (int cnum, PacketIterator *it)
@@ -438,6 +443,7 @@ init_packet_iterator (int cnum, PacketIterator *it)
  * @it: packet iterator.
  *
  * Destroys @it. Releases @it->index chunk.
+ * Must be executed after any using of PacketIterator.
  **/
 void
 destroy_packet_iterator (PacketIterator *it)
@@ -486,7 +492,7 @@ copy_packet_iterator (PacketIterator *dst, const PacketIterator *src)
 
 /**
  * to_start_packet:
- * @it: packet_iterator.
+ * @it: packet iterator.
  *
  * Sets @it to point to start packet of the cache.
  *
@@ -508,6 +514,29 @@ to_start_packet (PacketIterator *it)
 	res = change_chunk (it->cnum, other.index, it->index);
 	if (res == 0)
 		*it = other;
+	return res;
+}
+
+/**
+ * to_end_packet:
+ * @it: packet iterator.
+ *
+ * Sets @it to point to past-the-end packet of the cache.
+ *
+ * Returns: 0 on success, < 0 on failure.
+ **/
+int
+to_end_packet (PacketIterator *it)
+{
+	int res;
+
+	if (! it)
+		return 0;
+	if ((it->cnum < 0) || (it->cnum >= caches_count))
+		return cache_err_cnum;
+	res = change_chunk (it->cnum, caches[it->cnum].itpush.index, it->index);
+	if (res == 0)
+		*it = caches[it->cnum].itpush;
 	return res;
 }
 
@@ -682,6 +711,42 @@ get_packet (PacketIterator *it)
 	return NULL;
 }
 
+//TODO: description
+static int
+check_inner_iterators (int cnum, PacketIterator **ip, PacketIterator **iw)
+{
+	PacketIterator oip, oiw;
+	int err;
+
+	assert ((cnum >= 0) && (cnum < caches_count));
+	assert (ip);
+	assert (iw);
+	*ip = &caches[cnum].itpush;
+	assert ((*ip)->cnum == cnum);
+	*iw = &caches[cnum].itwrite;
+	assert ((*iw)->cnum == cnum);
+
+	oip = **ip;
+	oiw = **iw;
+	if (! oip.index) {
+		err = to_start_packet (&oip);
+		if (err)
+			return err;
+	}
+	if (! oiw.index) {
+		err = to_start_packet (&oiw);
+		if (err) {
+			/* rollback */
+			change_chunk (cnum, (*ip)->index, oip.index);
+			return err;
+		}
+	}
+	**ip = oip;
+	**iw = oiw;
+
+	return 0;
+}
+
 /**
  * save_packets:
  * @cnum: cache number.
@@ -698,40 +763,17 @@ save_packets (int cnum)
 
 	if ((cnum < 0) || (cnum >= caches_count))
 		return cache_err_cnum;
-	ip = &caches[cnum].itpush;
-	assert (ip->cnum == cnum);
-	iw = &caches[cnum].itwrite;
-	assert (iw->cnum == cnum);
-	{
-		PacketIterator  oip = *ip, oiw = *iw;
-
-		if (! oip.index) {
-			int res = to_start_packet (&oip);
-
-			if (res)
-				return res;
-		}
-		if (! oiw.index) {
-			int res = to_start_packet (&oiw);
-
-			if (res) {
-				/* rollback */
-				change_chunk (cnum, ip->index, oip.index);
-				return res;
-			}
-		}
-		*ip = oip;
-		*iw = oiw;
-	}
-
+	err = check_inner_iterators (cnum, &ip, &iw);
+	if (err)
+		return err;
 	if ((iw->index > ip->index) || ((iw->index == ip->index) && (iw->pos >= ip->pos)))
 		return 0;
 	if (seek_func (cnum, (long)(iw->index - 1) * packet_chunk_size + iw->pos) != 0)
 		return cache_err_file;
 	for (psaved = err = 0; (! err) && (iw->index < ip->index); ) {
-		Packet *sp     = &caches[cnum].array[iw->index].data[iw->pos];
-		size_t  wcount = packet_chunk_size - iw->pos;
-		size_t  count  = write_func (cnum, sp, wcount);
+		const Packet *sp = &caches[cnum].array[iw->index].data[iw->pos];
+		size_t  wcount   = packet_chunk_size - iw->pos;
+		size_t  count    = write_func (cnum, sp, wcount);
 
 		iw->pos += count;
 		if (count == wcount) {
@@ -744,15 +786,54 @@ save_packets (int cnum)
 		psaved = psaved || count;
 	}
 	if ((! err) && (iw->index == ip->index) && (iw->pos < ip->pos)) {
-		Packet *sp     = &caches[cnum].array[iw->index].data[iw->pos];
-		size_t  wcount = ip->pos - iw->pos;
-		size_t  count  = write_func (cnum, sp, wcount);
+		const Packet *sp = &caches[cnum].array[iw->index].data[iw->pos];
+		size_t  wcount   = ip->pos - iw->pos;
+		size_t  count    = write_func (cnum, sp, wcount);
 
 		iw->pos += count;
 		err = count != wcount;
 		psaved = psaved || count;
 	}
 	return psaved ? 0 : cache_err_file;
+}
+
+/**
+ * write_packet:
+ * @it: iterator pointed to position for writing.
+ * @packet: packet for writing.
+ *
+ * Writes @packet to position under @it and to underlying file.
+ * @it must be within [cache.start, cache.itpush) bounds.
+ * Doesn't write @packet to memory if writing to file fails.
+ *
+ * Returns: 0 on success, < 0 on failure.
+ **/
+int
+write_packet (const PacketIterator *it, const Packet *packet)
+{
+	PacketIterator *ip, *iw;
+	int err;
+
+	if ((! it) || (! packet))
+		return 0;
+	if ((it->cnum < 0) || (it->cnum >= caches_count))
+		return cache_err_cnum;
+	if ((! it->index) || (it->pos >= packet_chunk_size))
+		return cache_err_bound;
+	err = check_inner_iterators (it->cnum, &ip, &iw);
+	if (err)
+		return err;
+	if ((it->index > ip->index) || ((it->index == ip->index) && (it->pos >= ip->pos)))
+		return cache_err_bound;
+	if ((it->index > iw->index) || ((it->index == iw->index) && (it->pos >= iw->pos)))
+		return 0;
+	if (seek_func (it->cnum, (long)(it->index - 1) * packet_chunk_size + it->pos) != 0)
+		return cache_err_file;
+	if (write_func (it->cnum, packet, 1) == 1) {
+		caches[it->cnum].array[it->index].data[it->pos] = *packet;
+		return 0;
+	}
+	return cache_err_file;
 }
 
 /**
