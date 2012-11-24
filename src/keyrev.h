@@ -44,6 +44,7 @@ typedef enum {
  * @salt: current salt approximation.
  * @mask: known bits in @key.
  * @status: key reversing status.
+ * @considered: true if status was considered (TODO: unrelated field).
  * @pos: current count of scanned characters in encrypted stream.
  *
  * Holds key reversing state.
@@ -53,6 +54,7 @@ typedef struct {
 	unsigned int       salt;
 	unsigned int       mask;
 	KeyReversingStatus status;
+	char               considered; /*bool*/
 	size_t             pos;
 } KeyReverser;
 

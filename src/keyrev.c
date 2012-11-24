@@ -48,6 +48,7 @@ reset_reverser (KeyReverser *krev)
 	reset_decryption (&krev->salt);
 	krev->mask = 0;
 	krev->status = KR_STATUS_START;
+	krev->considered = 0;
 	krev->pos = 0;
 }
 

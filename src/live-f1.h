@@ -114,6 +114,8 @@ typedef struct {
  * (in @encrypted_cnum cache) to save received or reversed decryption key to.
  * @key_rev: key reversing state structure.
  * @key_request_failure: true if last key request has failed.
+ * @current_cipher: currently used cipher (0 for plaintext).
+ * @valid_frame: false if frame loading is required.
  *
  * @host: hostname to contact.
  * @auth_host: authorisation host to contact.
@@ -130,7 +132,6 @@ typedef struct {
  * from a key frame will get timestamp of this keyframe packet (@saving_time
  * freezes during querying key frame), packets received from the live timing
  * server will get current timestamp).
- * @frame: last seen key frame.
  * @new_frame: querying key frame.
  * @new_event_no: new event number (used for logging only).
  * @new_event_type: new event type (used for logging only).
@@ -151,6 +152,8 @@ typedef struct {
 	PacketIterator                    key_iter;
 	KeyReverser                       key_rev;
 	char                              key_request_failure; /*bool*/
+	int                               current_cipher;
+	char                              valid_frame; /*bool*/
 
 	char                             *host, *auth_host;
 	unsigned int                      port;
@@ -162,8 +165,7 @@ typedef struct {
 
 	time_t                            saving_time;
 
-	unsigned int                      frame, new_frame;
-
+	unsigned int                      new_frame;
 	unsigned int                      new_event_no;
 	EventType                         new_event_type;
 } StateReader;

@@ -56,7 +56,9 @@ clear_reader (StateReader *r)
 	destroy_packet_iterator (&r->key_iter);
 	init_packet_iterator (r->encrypted_cnum, &r->key_iter);
 	r->key_request_failure = 0;
-	r->frame = 0;
+	r->current_cipher = -1;
+	r->valid_frame = 0;
+	r->new_frame = 0;
 }
 
 /**

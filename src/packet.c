@@ -34,6 +34,10 @@
 #include "packet.h"
 
 
+/* Forward prototypes */
+static int read_decryption_key (unsigned int *decryption_key, const Packet *packet);
+
+
 /**
  * move_payload:
  * @res[out]: buffer to write result to.
@@ -273,6 +277,35 @@ clear_model (StateModel *m)
 	m->num_cars = 0;
 }
 
+//TODO: description
+static int
+push_key_packet (StateReader *r)
+{
+	const Packet *oldp;
+	Packet kp;
+	int res;
+
+	assert (r);
+
+	kp.car = 0;
+	kp.type = USER_SYS_KEY;
+	kp.data = 0;
+	kp.len = 0;
+	kp.at = r->saving_time;
+
+	oldp = get_packet (&r->key_iter);
+	if (oldp && (read_decryption_key (NULL, oldp) == -1)) {
+		info (5, _("Decryption key packet pushing was skipped\n"));
+		return 0;
+	}
+	to_end_packet (&r->key_iter);
+	res = push_packet (r->encrypted_cnum, &kp); //TODO: check errors in caller's code
+	info (5, "%s\n",
+	      res == 0 ? _("Decryption key packet was pushed to packet cache") :
+			 _("Decryption key packet pushing failed"));
+	return res;
+}
+
 /**
  * pre_handle_system_packet:
  * @r: stream reader structure.
@@ -305,16 +338,9 @@ pre_handle_system_packet (StateReader  *r,
 		 * obtain the decryption key for the event.
 		 */
 		info (4, _("\tgot SYS_EVENT_ID\n"));
-		{
-			Packet kp;
-			kp.car = 0;
-			kp.type = USER_SYS_KEY;
-			kp.data = 0;
-			kp.len = 0;
-			kp.at = r->saving_time;
-			to_end_packet (&r->key_iter); //TODO: old key_iter
-			push_packet (r->encrypted_cnum, &kp); //TODO: check errors
-		}
+
+		push_key_packet (r);
+
 		number = 0;
 		for (i = 1; i < packet->len; i++) {
 			number *= 10;
@@ -345,11 +371,10 @@ pre_handle_system_packet (StateReader  *r,
 		/* Decryption key should be obtained only after key frame
 		 * receiving. Server returns null key otherwise.
 		 */
-		if (! r->frame) {
+		if ((! r->valid_frame) && (number > r->new_frame)) {
 			r->new_frame = number;
 			start_get_key_frame (r);
-		} else
-			r->frame = number;
+		}
 		break;
 	case SYS_VALID_MARKER:
 		info (4, _("\tgot SYS_VALID_MARKER\n"));
@@ -390,19 +415,22 @@ pre_handle_system_packet (StateReader  *r,
 static int
 read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 {
-	assert (decryption_key && packet);
+	assert (packet);
 
 	if (packet->car || (packet->type != USER_SYS_KEY))
-		return -1;
+		return -2;
 	//TODO: without magic codes
-	if (packet->data == 1)
-		*decryption_key = 0;
-	else if (packet->data == 3) {
-		int i;
+	if (packet->data == 1) {
+		if (decryption_key)
+			*decryption_key = 0;
+	} else if (packet->data == 3) {
+		if (decryption_key) {
+			int i;
 
-		*decryption_key = 0;
-		for (i = packet->len; i; --i)
-			*decryption_key = (*decryption_key << 8) | packet->payload[i - 1];
+			*decryption_key = 0;
+			for (i = packet->len; i; --i)
+				*decryption_key = (*decryption_key << 8) | packet->payload[i - 1];
+		}
 	} else
 		return -1;
 	return 0;
@@ -413,16 +441,19 @@ int
 write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher)
 {
 	const Packet *oldp;
-	unsigned int old_key;
+	unsigned int old_key, new_key;
 	Packet p;
-	int i;
+	int i, res;
 
 	if ((! r) || ((cipher == 1) && (! decryption_key)))
 		return -1;
 	oldp = get_packet (&r->key_iter);
 	if (! oldp)
 		return -1;
-	if (read_decryption_key (&old_key, oldp) == 0) {
+	res = read_decryption_key (&old_key, oldp);
+	if (res < -1)
+		return -1;
+	if (res == 0) {
 		int oldcipher = oldp->data >> 1;
 
 		if ((oldcipher == cipher) && (old_key == decryption_key)) {
@@ -441,9 +472,13 @@ write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher)
 	p = *oldp;
 	p.data = (cipher << 1) | 1;
 	p.len = sizeof (decryption_key);
-	for (i = 0; i < p.len; ++i, decryption_key >>= 8)
-		p.payload[i] = decryption_key & 0xff;
-	return write_packet (&r->key_iter, &p);
+	for (i = 0, new_key = decryption_key; i < p.len; ++i, new_key >>= 8)
+		p.payload[i] = new_key & 0xff;
+	res = write_packet (&r->key_iter, &p);
+	info (5, _("Decryption key (%08x, cipher = %d) %s\n"),
+	      decryption_key, cipher,
+	      res == 0 ? _("was written to packet cache") : _("writing failed"));
+	return res;
 }
 
 /**
@@ -692,8 +727,9 @@ handle_system_packet (StateModel   *m,
 	case USER_SYS_KEY:
 		info (4, _("\thandle USER_SYS_KEY\n"));
 		if (read_decryption_key (&m->decryption_key, packet) == 0)
-			info (3, _("Decryption key (%08x) was loaded from packet cache\n"),
-			      m->decryption_key);
+			info (3, _("Decryption key (%08x, cipher = %d, confidence = %d)"
+			      " was loaded from packet cache\n"),
+			      m->decryption_key, packet->data >> 1, packet->data & 1);
 		break;
 	default:
 		/* Unhandled event */
@@ -701,6 +737,54 @@ handle_system_packet (StateModel   *m,
 		      packet->type);
 		break;
 	}
+}
+
+//TODO: description
+static void
+check_keyrev_status (StateReader *r)
+{
+	int cipher;
+
+	assert (r);
+
+	if (r->key_rev.considered)
+		return;
+	cipher =
+	     r->key_rev.status == KR_STATUS_SUCCESS   ? 1 :
+	    (r->key_rev.status == KR_STATUS_PLAINTEXT ? 0 : -1);
+	if ((cipher < 0) || (write_decryption_key (r->key_rev.key, r, cipher) != 0))
+		return;
+	r->key_rev.considered = 1;
+	r->current_cipher = cipher;
+
+	info (3, _("Decryption key (%08x, cipher = %d) was reversed\n"),
+	      r->key_rev.key, r->current_cipher);
+}
+
+//TODO: description
+static void
+check_cipher_switch (StateReader *r, const Packet *p, char start)
+{
+	int cipher;
+
+	assert (r && p);
+
+	if (! is_crypted (p))
+		return;
+	if (start && (p->car == 0) && (p->type == SYS_NOTICE))
+		return;
+	cipher =
+	     r->key_rev.status == KR_STATUS_SUCCESS   ? 1 :
+	    (r->key_rev.status == KR_STATUS_PLAINTEXT ? 0 : -1);
+	if (cipher == r->current_cipher)
+		return;
+	if ((cipher < 0) && (r->current_cipher > 0))
+		return;
+	/* We suspect every crypted non-start packet in plaintext mode
+	 * of switching to encryption mode.
+	 */
+	r->valid_frame = 0;
+	push_key_packet (r);
 }
 
 /**
@@ -721,26 +805,24 @@ pre_handle_packet (StateReader  *r,
                    const Packet *packet,
 		   char from_frame)
 {
-	int res;
+	static int start = 0; //TODO: make non-static (move to StateReader).
+	int crypted;
+	int (* pre_handler) (StateReader *, const Packet *, char);
 
 	if ((! r) || (! packet))
 		return;
+
+	if (is_reset_decryption_packet (packet))
+		start = 1;
+	crypted = is_crypted (packet);
 	reverse_key (&r->key_rev, packet);
-	res = -1;
-	if (r->key_rev.status == KR_STATUS_SUCCESS)
-		res = write_decryption_key (r->key_rev.key, r, 1);
-	else if (r->key_rev.status == KR_STATUS_PLAINTEXT)
-		res = write_decryption_key (r->key_rev.key, r, 0);
-	if (res == 0) {
-		r->key_rev.status = KR_STATUS_LAST;
-		info (3, _("Decryption key (%08x) was reversed\n"),
-		      r->key_rev.key);
-	}
-	if (packet->car)
-		res = pre_handle_car_packet (r, packet, from_frame);
-	else
-		res = pre_handle_system_packet (r, packet, from_frame);
-	if (res || from_frame)
+	check_keyrev_status (r);
+	check_cipher_switch (r, packet, start);
+	if (start && crypted)
+		start = 0;
+
+	pre_handler = packet->car ? pre_handle_car_packet : pre_handle_system_packet;
+	if (pre_handler (r, packet, from_frame) || from_frame)
 		push_packet (r->encrypted_cnum, packet); //TODO: check errors
 }
 

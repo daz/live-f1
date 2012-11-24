@@ -481,15 +481,15 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 		info (2, _("Decryption key obtained\n"));
 		res = create_sr_result (sr, req);
 		if (res) {
-			EventNumTypePair *evnt = res->userdata;
+			EventNumTypePair *userdata = res->userdata;
 
-			if (evnt) {
+			if (userdata) {
 				unsigned int decryption_key;
 
 				parse_sr_result (&decryption_key, res, parse_hex_number);
 				info (3, _("Got decryption key: %08x\n"), decryption_key);
 				info (3, _("Begin new event #%d (type: %d)\n"),
-				      evnt->no, evnt->type); //TODO: to other place
+				      userdata->no, userdata->type); //TODO: to other place
 
 				write_decryption_key (decryption_key, sr->r, 1); //TODO: check errors
 				continue_pre_handle_stream (sr->r);
@@ -520,7 +520,7 @@ void
 start_get_decryption_key (StateReader *r)
 {
 	StateRequest     *sr;
-	EventNumTypePair *evnt;
+	EventNumTypePair *userdata;
 	size_t            len;
 	char             *url;
 
@@ -533,23 +533,25 @@ start_get_decryption_key (StateReader *r)
 	if (! r->cookie)
 		return;
 
+	userdata = malloc (sizeof (*userdata));
+	if (! userdata)
+		return;
+	userdata->no = r->new_event_no;
+	userdata->type = r->new_event_type;
+
+	sr = create_state_request (r, do_get_decryption_key, r->host, userdata);
+	if (! sr) {
+		free (userdata);
+		return;
+	}
+
 	info (1, _("Obtaining decryption key ...\n"));
 
-	evnt = malloc (sizeof (*evnt));
-	if (! evnt)
-		return;
-	evnt->no = r->new_event_no;
-	evnt->type = r->new_event_type;
-
-	sr = create_state_request (r, do_get_decryption_key, r->host, evnt);
-	if (! sr)
-		return;
-
-	len = strlen (KEY_URL_BASE) + numlen (evnt->no) + strlen (r->cookie) + 11;
+	len = strlen (KEY_URL_BASE) + numlen (userdata->no) + strlen (r->cookie) + 11;
 	url = malloc (len);
 	if (url)
 		snprintf (url, len,
-		          "%s%u.asp?auth=%s", KEY_URL_BASE, evnt->no, r->cookie);
+		          "%s%u.asp?auth=%s", KEY_URL_BASE, userdata->no, r->cookie);
 
 	r->key_request_failure = (! url) || evhttp_make_request (sr->conn, sr->req,
 								 EVHTTP_REQ_GET, url);
@@ -611,8 +613,9 @@ do_get_key_frame (struct evhttp_request *req, void *arg)
 	clear_obtaining_flag (sr->r, OBTAINING_FRAME);
 
 	if (is_valid_http_response_code (code)) {
-		info (2, _("Key frame received\n"));
-		sr->r->frame = sr->r->new_frame;
+		sr->r->valid_frame = 1;
+		info (2, _("Key frame #%u received\n"),
+		      (unsigned int) (sr->userdata ? *((unsigned int *) sr->userdata) : 0));
 		read_stream (sr->r, evhttp_request_get_input_buffer (req), 1);
 	} else
 		info (0, "%s: %s: %s %d\n", program_name,
@@ -635,18 +638,20 @@ start_get_key_frame (StateReader *r)
 	StateRequest *sr;
 	size_t        len;
 	char         *url;
+	unsigned int *userdata;
 
 	if (r->obtaining & OBTAINING_FRAME)
 		return;
 
-	if (r->new_frame > 0)
-		info (2, _("Obtaining key frame %d ...\n"), r->new_frame);
-	else
-		info (2, _("Obtaining current key frame ...\n"));
-
-	sr = create_state_request (r, do_get_key_frame, r->host, NULL);
-	if (! sr)
+	userdata = malloc (sizeof (*userdata));
+	if (! userdata)
 		return;
+	*userdata = r->new_frame;
+	sr = create_state_request (r, do_get_key_frame, r->host, userdata);
+	if (! sr) {
+		free (userdata);
+		return;
+	}
 
 	len = strlen (KEYFRAME_URL_PREFIX) +
 	      (r->new_frame > 0 ? MAX (numlen (r->new_frame), 5) + 1 : 0) + 5;
@@ -658,6 +663,11 @@ start_get_key_frame (StateReader *r)
 			snprintf (url, len, "%s.bin", KEYFRAME_URL_PREFIX);
 	}
 
+	if (r->new_frame > 0)
+		info (2, _("Obtaining key frame %d ...\n"), r->new_frame);
+	else
+		info (2, _("Obtaining current key frame ...\n"));
+
 	if (! url || evhttp_make_request (sr->conn, sr->req,
 	                                  EVHTTP_REQ_GET, url)) {
 		info (0, "%s: %s\n", program_name,
@@ -668,7 +678,6 @@ start_get_key_frame (StateReader *r)
 		r->stop_handling_reason |= OBTAINING_FRAME;
 	}
 	free (url);
-
 }
 
 /**
