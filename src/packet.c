@@ -765,21 +765,22 @@ check_keyrev_status (StateReader *r)
 static void
 check_cipher_switch (StateReader *r, const Packet *p, char start)
 {
-	int cipher;
-
 	assert (r && p);
 
 	if (! is_crypted (p))
 		return;
 	if (start && (p->car == 0) && (p->type == SYS_NOTICE))
 		return;
-	cipher =
-	     r->key_rev.status == KR_STATUS_SUCCESS   ? 1 :
-	    (r->key_rev.status == KR_STATUS_PLAINTEXT ? 0 : -1);
-	if (cipher == r->current_cipher)
-		return;
-	if ((cipher < 0) && (r->current_cipher > 0))
-		return;
+	if (r->current_cipher > 0) {
+		int cipher =
+		     r->key_rev.status == KR_STATUS_SUCCESS   ? 1 :
+		    (r->key_rev.status == KR_STATUS_PLAINTEXT ? 0 : -1);
+
+		if (cipher == r->current_cipher)
+			return;
+		if ((cipher < 0) && (r->current_cipher > 0))
+			return;
+	}
 	/* We suspect every crypted non-start packet in plaintext mode
 	 * of switching to encryption mode.
 	 */
