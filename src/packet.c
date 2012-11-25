@@ -371,6 +371,12 @@ pre_handle_system_packet (StateReader  *r,
 		/* Decryption key should be obtained only after key frame
 		 * receiving. Server returns null key otherwise.
 		 */
+		/* We shouldn't load already loaded packets
+		 * (clear_reader is called on (re)connection and resets
+		 * new_frame to 0).
+		 */
+		//TODO: add loaded_frame field and
+		// s/number > r->new_frame/number > r->loaded_frame/
 		if ((! r->valid_frame) && (number > r->new_frame)) {
 			r->new_frame = number;
 			start_get_key_frame (r);

@@ -216,9 +216,9 @@ handle_reading_event (struct bufferevent *bev, short what, StateReader *r)
 		fin = 1;
 	}
 	if (what & BEV_EVENT_ERROR) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			_("error reading from data stream"),
-			evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
+		info (0, "%s: %s: %s\n", program_name,
+		      _("error reading from data stream"),
+		      evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
 		fin = 1;
 	}
 	if (fin) {
@@ -242,9 +242,9 @@ static int
 handle_writing_event (struct bufferevent *bev, short what, StateReader *r)
 {
 	if (what & BEV_EVENT_ERROR) {
-		fprintf (stderr, "%s: %s: %s\n", program_name,
-			_("error writing to data stream"),
-			evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
+		info (0, "%s: %s: %s\n", program_name,
+		      _("error writing to data stream"),
+		      evutil_socket_error_to_string (EVUTIL_SOCKET_ERROR ()));
 		bufferevent_disable (bev, EV_WRITE);
 		return 1;
 	}
@@ -258,16 +258,40 @@ handle_writing_event (struct bufferevent *bev, short what, StateReader *r)
  * @arg: stream reader structure.
  *
  * bufferevent event/error callback (see bufferevent_event_cb).
- * Enables reading (EV_READ) and writing (EV_WRITE) on successful connection,
- * calls start_open_stream for next attempt on failed connection,
- * calls handle_reading_event/handle_writing_event during
- * data transfer process.
+ * Calls handle_reading_event/handle_writing_event.
  **/
 static void
 do_event_stream (struct bufferevent *bev, short what, void *arg)
 {
 	StateReader *r = arg;
-	int          fin = 0, finconnect = 0;
+	int          fin = 0;
+
+	if (what & BEV_EVENT_READING)
+		fin = handle_reading_event (bev, what, r) || fin;
+	if (what & BEV_EVENT_WRITING)
+		fin = handle_writing_event (bev, what, r) || fin;
+
+	if (fin) {
+		bufferevent_free (bev);
+		info (3, _("bufferevent was destroyed\n"));
+	}
+}
+
+/**
+ * do_connect_stream:
+ * @bev: libevent's bufferevent.
+ * @what: event reason.
+ * @arg: stream reader structure.
+ *
+ * bufferevent connect callback (see bufferevent_event_cb).
+ * Enables reading and writing on successful connection,
+ * calls start_open_stream for next attempt on failed connection.
+ **/
+static void
+do_connect_stream (struct bufferevent *bev, short what, void *arg)
+{
+	StateReader *r = arg;
+	int          fin = 0;
 
 	if (what & BEV_EVENT_CONNECTED) {
 		/* Ping interval (we shall ping server after last
@@ -275,25 +299,19 @@ do_event_stream (struct bufferevent *bev, short what, void *arg)
 		 */
 		const struct timeval intrv = {1, 0};
 
-		finconnect = (bufferevent_enable (bev, EV_READ | EV_WRITE) != 0) ||
-		             (bufferevent_set_timeouts (bev, &intrv, NULL) != 0);
-		if (! finconnect) {
-			info (2, _("Connected to %s.\n"), r->addr->ai_canonname);
-			clear_reader (r);
-		}
+		bufferevent_setcb (bev, do_read_stream, do_write_stream, do_event_stream, r);
+		fin = (bufferevent_enable (bev, EV_READ | EV_WRITE) != 0) ||
+		      (bufferevent_set_timeouts (bev, &intrv, NULL) != 0);
 	} else if (what & BEV_EVENT_ERROR)
-		finconnect = ! (bufferevent_get_enabled (bev) & EV_READ);
+		fin = 1;
 
-	if (what & BEV_EVENT_READING)
-		fin = handle_reading_event (bev, what, r) || fin;
-	if (what & BEV_EVENT_WRITING)
-		fin = handle_writing_event (bev, what, r) || fin;
-
-	if (fin || finconnect) {
+	if (! fin) {
+		info (2, _("Connected to %s.\n"), r->addr->ai_canonname);
+		clear_reader (r);
+	} else {
 		bufferevent_free (bev);
 		info (3, _("bufferevent was destroyed\n"));
-		if (finconnect)
-			start_open_stream (r);
+		start_open_stream (r);
 	}
 }
 
@@ -303,7 +321,7 @@ do_event_stream (struct bufferevent *bev, short what, void *arg)
  *
  * Attempts to make a connection to next address in addresses list.
  * Creates bufferevent, but does not enable reading and writing
- * (they will be enabled at do_event_stream after successful connection).
+ * (they will be enabled at do_connect_stream after successful connection).
  **/
 static void
 start_open_stream (StateReader *r)
@@ -319,8 +337,7 @@ start_open_stream (StateReader *r)
 		if (bev) {
 			info (3, _("bufferevent was created\n"));
 
-			bufferevent_setcb (bev, do_read_stream, do_write_stream,
-			                   do_event_stream, r);
+			bufferevent_setcb (bev, NULL, NULL, do_connect_stream, r);
 			if (bufferevent_socket_connect (bev, r->addr->ai_addr,
 			                                r->addr->ai_addrlen) == 0)
 				return;
@@ -329,8 +346,8 @@ start_open_stream (StateReader *r)
 			info (3, _("bufferevent was destroyed\n"));
 		}
 	}
-	fprintf (stderr, "%s: %s\n", program_name,
-		 _("unable to open data stream"));
+	info (0, "%s: %s\n", program_name,
+	      _("unable to open data stream"));
 	start_loopexit (r->base);
 }
 
@@ -350,9 +367,9 @@ do_getaddrinfo (int errcode, struct evutil_addrinfo *res, void *arg)
 
 	r->gaireq = NULL;
 	if (errcode) {
-		fprintf (stderr, "%s: %s: %s: %s\n", program_name,
-		         _("failed to resolve host"), r->host,
-			 evutil_gai_strerror (errcode));
+		info (0, "%s: %s: %s: %s\n", program_name,
+		      _("failed to resolve host"), r->host,
+		      evutil_gai_strerror (errcode));
 		start_loopexit (r->base);
 	} else {
 		info (1, _("Connecting to data stream ...\n"));
