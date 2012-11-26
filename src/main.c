@@ -630,24 +630,20 @@ info (int         irrelevance,
 {
 	va_list ap;
 	int     ret;
+	char msg[512];
 
-	if (verbosity >= irrelevance) {
-		char msg[512];
+	va_start (ap, format);
 
-		va_start (ap, format);
+	ret = vsnprintf (msg, sizeof (msg), format, ap);
+	msg[sizeof (msg) - 1] = 0;
 
-		ret = vsnprintf (msg, sizeof (msg), format, ap);
-		msg[sizeof (msg) - 1] = 0;
+	if (irrelevance >= 0)
+		info_message ((size_t) irrelevance, msg);
+	if ((debug_mode || (! cursed)) && (verbosity >= irrelevance))
+		fputs (msg, stderr);
 
-		info_message (msg);
-		if (debug_mode || (! cursed))
-			ret = vfprintf (stderr, format, ap);
-
-		va_end (ap);
-		return ret;
-	} else {
-		return 0;
-	}
+	va_end (ap);
+	return ret;
 }
 
 /**
@@ -700,6 +696,9 @@ print_usage (void)
 		  "  'p'                        pause/unpause live timing or replay.\n"
 		  "  '0'                        set time gap to 0 (press '0' again\n"
 		  "                             if you want to restore last gap).\n"
+		  "  '1'..'9'                   switch verbosity level of displayed\n"
+		  "                             log messages (greater value means\n"
+		  "                             greater verbosity).\n"
 		  "  LEFT, RIGHT, UP, DOWN      move screen.\n"
 		  "  'q', ESC, ENTER            quit.\n"));
 	printf ("\n");

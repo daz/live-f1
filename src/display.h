@@ -40,7 +40,7 @@ void clear_car     (StateModel *m, int car);
 void update_status (StateModel *m);
 void update_time   (StateModel *m);
 
-void info_message (const char *message);
+void info_message (size_t index, const char *message);
 
 SJR_END_EXTERN
 

@@ -87,15 +87,21 @@ static WINDOW *boardwin = NULL;
 static WINDOW *statwin = NULL;
 static WINDOW *infowin = NULL;
 
-/* Size of info_ring */
+/* Count of info_rings */
+#define DISPLAY_INFO_RING_BUFFER_COUNT 9
+static const size_t info_ring_count = DISPLAY_INFO_RING_BUFFER_COUNT;
+/* Size of info_ring[i] */
 #define DISPLAY_INFO_RING_BUFFER_SIZE 32
 static const size_t info_ring_size = DISPLAY_INFO_RING_BUFFER_SIZE;
 /* Max length of message in info_ring */
 static const size_t info_msg_width = 80;
-/* Ring buffer for info messages */
-static char *info_ring[DISPLAY_INFO_RING_BUFFER_SIZE];
-/* Index of most recent message in info_ring */
-static size_t info_head = DISPLAY_INFO_RING_BUFFER_SIZE - 1;
+/* Ring buffers for info messages */
+static char *info_ring[DISPLAY_INFO_RING_BUFFER_COUNT][DISPLAY_INFO_RING_BUFFER_SIZE];
+/* Indexes of most recent messages in info_rings */
+static size_t info_head[DISPLAY_INFO_RING_BUFFER_COUNT];
+
+/* Index of currently displayed (in infowin) info_ring */
+static size_t displayed_info_index = 0;
 
 /**
  * open_display:
@@ -862,11 +868,13 @@ update_time (StateModel *m)
 void
 close_display (void)
 {
-	size_t i;
+	size_t i, j;
 
-	for (i = 0; i < info_ring_size; ++i) {
-		free (info_ring[i]);
-		info_ring[i] = NULL;
+	for (i = 0; i < info_ring_count; ++i) {
+		for (j = 0; j < info_ring_size; ++j) {
+			free (info_ring[i][j]);
+			info_ring[i][j] = NULL;
+		}
 	}
 
 	if (! cursed)
@@ -900,7 +908,10 @@ handle_keys (StateModel *m)
 	if (! cursed)
 		return 0;
 
-	switch (getch ()) {
+	int ch = getch ();
+	switch (ch) {
+		size_t new_disp_info_index;
+
 	case KEY_ENTER:
 	case '\r':
 	case '\n':
@@ -971,6 +982,25 @@ handle_keys (StateModel *m)
 	case 'P':
 		m->paused = ! m->paused;
 		return 1;
+	case '1':
+	case '2':
+	case '3':
+	case '4':
+	case '5':
+	case '6':
+	case '7':
+	case '8':
+	case '9':
+		new_disp_info_index = ch - '1';
+		if (new_disp_info_index >= info_ring_count)
+			new_disp_info_index = info_ring_count - 1;
+		if (displayed_info_index != new_disp_info_index) {
+			displayed_info_index = new_disp_info_index;
+			_update_info ();
+			outrefresh_window (infowin);
+			doupdate ();
+		}
+		return 1;
 	default:
 		return 0;
 	}
@@ -978,24 +1008,27 @@ handle_keys (StateModel *m)
 
 /**
  * new_info_line:
+ * @index: index of info_ring.
  * @with_time: true if time header required.
  * @spaces: blank spaces at the beginning of a line.
  *
- * Adds new string of info_msg_width length to info_ring and write time
- * (@with_time == true) or @spaces at the beginning of it.
+ * Adds new string of info_msg_width length to info_ring[@index] and write
+ * time (@with_time == true) or @spaces at the beginning of it.
  *
  * Returns: header symbols count or -1 on failure.
  **/
 static int
-new_info_line (int with_time, int spaces)
+new_info_line (size_t index, int with_time, int spaces)
 {
-	info_head = (info_head + 1) % info_ring_size;
-	if (! info_ring[info_head]) {
-		info_ring[info_head] = malloc (info_msg_width + 1);
-		if (! info_ring[info_head])
+	if (index >= info_ring_count)
+		return -1;
+	info_head[index] = (info_head[index] + 1) % info_ring_size;
+	if (! info_ring[index][info_head[index]]) {
+		info_ring[index][info_head[index]] = malloc (info_msg_width + 1);
+		if (! info_ring[index][info_head[index]])
 			return -1;
 	}
-	memset (info_ring[info_head], 0, info_msg_width + 1);
+	memset (info_ring[index][info_head[index]], 0, info_msg_width + 1);
 	if (with_time) {
 		time_t ct = time (NULL) % 86400;
 		int    h, m, s;
@@ -1005,31 +1038,36 @@ new_info_line (int with_time, int spaces)
 		h = ct / 3600;
 		m = (ct % 3600) / 60;
 		s = ct % 60;
-		return snprintf (info_ring[info_head], info_msg_width + 1,
-		                 "%02d:%02d:%02d ", h, m, s);
+		return snprintf (info_ring[index][info_head[index]],
+				 info_msg_width + 1,
+				 "%02d:%02d:%02d ", h, m, s);
 	} else {
 		int res = MIN (spaces, info_msg_width);
 
-		memset (info_ring[info_head], ' ', res);
+		memset (info_ring[index][info_head[index]], ' ', res);
 		return res;
 	}
 }
 
 /**
  * split_message:
+ * @index: index of info_ring.
  * @message: message to split.
  *
- * Splits long message by words and adds it to info_ring.
+ * Splits long message by words and adds it to info_ring[@index].
  * Also replaces whitespaces with ordinary spaces.
  **/
 static void
-split_message (const char *message)
+split_message (size_t index, const char *message)
 {
 	const size_t  len = strlen (message);
 	int           col, ls, i;
-	const int     spaces = new_info_line (1, 0);
-	char         *msg = info_ring[info_head];
+	const int     spaces = new_info_line (index, 1, 0);
+	char         *msg;
 
+	if (index >= info_ring_count)
+		return;
+	msg = info_ring[index][info_head[index]];
 	col = spaces;
 	if ((col < 0) || (col >= info_msg_width))
 		return;
@@ -1047,10 +1085,10 @@ split_message (const char *message)
 				i = ls;
 			}
 			msg[col] = 0;
-			col = new_info_line (0, spaces);
+			col = new_info_line (index, 0, spaces);
 			if ((col < 0) || (col >= info_msg_width))
 				return;
-			msg = info_ring[info_head];
+			msg = info_ring[index][info_head[index]];
 			ls = -1;
 		}
 	}
@@ -1068,54 +1106,67 @@ _update_info ()
 {
 	size_t i, line;
 
+	if (displayed_info_index >= info_ring_count)
+		return;
+
 	if (! infowin) {
 		infowin = newpad (info_ring_size + 1, info_msg_width + 1);
 		wbkgdset (infowin, attrs[COLOUR_POPUP]);
 		werase (infowin);
 	}
 
-	i = (info_head + 1) % info_ring_size;
+	i = (info_head[displayed_info_index] + 1) % info_ring_size;
 	for (line = 0; line < info_ring_size; i = (i + 1) % info_ring_size, ++line) {
 		wmove (infowin, line, 0);
 		wclrtoeol (infowin);
-		if (! info_ring[i])
+		if (! info_ring[displayed_info_index][i])
 			continue;
 		wmove (infowin, line, 0);
-		waddnstr (infowin, info_ring[i], info_msg_width);
+		waddnstr (infowin, info_ring[displayed_info_index][i], info_msg_width);
 	}
 
 }
 
 /**
  * info_message:
+ * @index: index of info_ring.
  * @message: message to display.
  *
- * Adds @message to info_ring and displays it on the screen.
+ * Adds @message to info_ring[i] for each i >= @index and
+ * displays it on the screen if displayed_info_index >= @index.
  **/
 void
-info_message (const char *message)
+info_message (size_t index, const char *message)
 {
 	char  *msg;
 	size_t msglen;
-	regex_t re;
+	static regex_t *re = NULL;
 
-	regcomp(&re, "^img:", REG_EXTENDED|REG_NOSUB);
+	if (! re) {
+		re = malloc (sizeof (*re));
+		if (! re)
+			return;
+		regcomp(re, "^img:", REG_EXTENDED|REG_NOSUB);
+	}
 
-	if (regexec(&re, message, (size_t)0, NULL, 0) == 0)
+	if (regexec(re, message, 0, NULL, 0) == 0)
 		msg = strdup ("CURRENTLY NO LIVE SESSION");
 	else
 		msg = strdup (message);
-	regfree (&re);
 
 	msglen = strlen (msg);
 	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
 		msg[--msglen] = 0;
-	if (msglen)
-		split_message (msg);
+	if (msglen) {
+		size_t i;
+
+		for (i = index; i < info_ring_count; ++i)
+			split_message (i, msg);
+	}
 
 	free (msg);
 
-	if ((! msglen) || (! cursed))
+	if ((! msglen) || (! cursed) || (displayed_info_index < index))
 		return;
 
 	_update_info ();
