@@ -24,10 +24,10 @@
 #endif /* HAVE_CONFIG_H */
 
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <curses.h>
-#include <time.h>
 #include <regex.h>
 
 #include "live-f1.h"
@@ -87,7 +87,7 @@ static WINDOW *boardwin = NULL;
 static WINDOW *statwin = NULL;
 static WINDOW *infowin = NULL;
 
-/* Count of info_rings */
+/* Count of info_rings (without commentaries ring) */
 #define DISPLAY_INFO_RING_BUFFER_COUNT 9
 static const size_t info_ring_count = DISPLAY_INFO_RING_BUFFER_COUNT;
 /* Size of info_ring[i] */
@@ -95,13 +95,23 @@ static const size_t info_ring_count = DISPLAY_INFO_RING_BUFFER_COUNT;
 static const size_t info_ring_size = DISPLAY_INFO_RING_BUFFER_SIZE;
 /* Max length of message in info_ring */
 static const size_t info_msg_width = 80;
-/* Ring buffers for info messages */
-static char *info_ring[DISPLAY_INFO_RING_BUFFER_COUNT][DISPLAY_INFO_RING_BUFFER_SIZE];
+/* Ring buffers for info messages (last buffer is used for commentaries) */
+static char *info_ring[DISPLAY_INFO_RING_BUFFER_COUNT + 1][DISPLAY_INFO_RING_BUFFER_SIZE];
 /* Indexes of most recent messages in info_rings */
-static size_t info_head[DISPLAY_INFO_RING_BUFFER_COUNT];
+static size_t info_head[DISPLAY_INFO_RING_BUFFER_COUNT + 1];
 
 /* Index of currently displayed (in infowin) info_ring */
 static size_t displayed_info_index = 0;
+
+/* Current commentary buffer */
+static char *commentary = NULL;
+/* size of commentary */
+static size_t commentary_size = 0;
+/* capacity of commentary buffer */
+static size_t commentary_capacity = 0;
+
+/* Last saved timestamp (used for displaying commentary's time) */
+static time_t last_timestamp = 0;
 
 /**
  * open_display:
@@ -870,7 +880,7 @@ close_display (void)
 {
 	size_t i, j;
 
-	for (i = 0; i < info_ring_count; ++i) {
+	for (i = 0; i <= info_ring_count; ++i) {
 		for (j = 0; j < info_ring_size; ++j) {
 			free (info_ring[i][j]);
 			info_ring[i][j] = NULL;
@@ -1001,6 +1011,15 @@ handle_keys (StateModel *m)
 			doupdate ();
 		}
 		return 1;
+	case 'c':
+	case 'C':
+		if (displayed_info_index != info_ring_count) {
+			displayed_info_index = info_ring_count;
+			_update_info ();
+			outrefresh_window (infowin);
+			doupdate ();
+		}
+		return 1;
 	default:
 		return 0;
 	}
@@ -1009,18 +1028,19 @@ handle_keys (StateModel *m)
 /**
  * new_info_line:
  * @index: index of info_ring.
- * @with_time: true if time header required.
+ * @time_kind: 0 if time header is not required,
+ * 1 for real time, 2 for last_timestamp.
  * @spaces: blank spaces at the beginning of a line.
  *
  * Adds new string of info_msg_width length to info_ring[@index] and write
- * time (@with_time == true) or @spaces at the beginning of it.
+ * time (@time_kind != 0) or @spaces at the beginning of it.
  *
  * Returns: header symbols count or -1 on failure.
  **/
 static int
-new_info_line (size_t index, int with_time, int spaces)
+new_info_line (size_t index, int time_kind, int spaces)
 {
-	if (index >= info_ring_count)
+	if (index > info_ring_count)
 		return -1;
 	info_head[index] = (info_head[index] + 1) % info_ring_size;
 	if (! info_ring[index][info_head[index]]) {
@@ -1029,8 +1049,8 @@ new_info_line (size_t index, int with_time, int spaces)
 			return -1;
 	}
 	memset (info_ring[index][info_head[index]], 0, info_msg_width + 1);
-	if (with_time) {
-		time_t ct = time (NULL) % 86400;
+	if (time_kind) {
+		time_t ct = (time_kind == 1 ? time (NULL) : last_timestamp) % 86400;
 		int    h, m, s;
 
 		if (ct < 0)
@@ -1040,7 +1060,8 @@ new_info_line (size_t index, int with_time, int spaces)
 		s = ct % 60;
 		return snprintf (info_ring[index][info_head[index]],
 				 info_msg_width + 1,
-				 "%02d:%02d:%02d ", h, m, s);
+				 (time_kind == 1 ? "%02d:%02d:%02d " : "+%01d:%02d:%02d " ),
+				 h, m, s);
 	} else {
 		int res = MIN (spaces, info_msg_width);
 
@@ -1052,20 +1073,22 @@ new_info_line (size_t index, int with_time, int spaces)
 /**
  * split_message:
  * @index: index of info_ring.
+ * @time_kind: 0 if time header is not required,
+ * 1 for real time, 2 for last_timestamp.
  * @message: message to split.
  *
  * Splits long message by words and adds it to info_ring[@index].
  * Also replaces whitespaces with ordinary spaces.
  **/
 static void
-split_message (size_t index, const char *message)
+split_message (size_t index, int time_kind, const char *message)
 {
 	const size_t  len = strlen (message);
 	int           col, ls, i;
-	const int     spaces = new_info_line (index, 1, 0);
+	const int     spaces = new_info_line (index, time_kind, 0);
 	char         *msg;
 
-	if (index >= info_ring_count)
+	if (index > info_ring_count)
 		return;
 	msg = info_ring[index][info_head[index]];
 	col = spaces;
@@ -1106,7 +1129,7 @@ _update_info ()
 {
 	size_t i, line;
 
-	if (displayed_info_index >= info_ring_count)
+	if (displayed_info_index > info_ring_count)
 		return;
 
 	if (! infowin) {
@@ -1125,6 +1148,23 @@ _update_info ()
 		waddnstr (infowin, info_ring[displayed_info_index][i], info_msg_width);
 	}
 
+}
+
+/**
+ * right_trim:
+ * @str: string to trim.
+ * @len: length of @str.
+ *
+ * Removes trailing blanks in @str.
+ *
+ * Returns: new length of @str.
+ **/
+static size_t
+right_trim (char *str, size_t len)
+{
+	while (len && strchr(" \t\r\n", str[len - 1]))
+		str[--len] = 0;
+	return len;
 }
 
 /**
@@ -1154,14 +1194,12 @@ info_message (size_t index, const char *message)
 	else
 		msg = strdup (message);
 
-	msglen = strlen (msg);
-	while (msglen && strchr(" \t\r\n", msg[msglen - 1]))
-		msg[--msglen] = 0;
+	msglen = right_trim (msg, strlen (msg));
 	if (msglen) {
 		size_t i;
 
 		for (i = index; i < info_ring_count; ++i)
-			split_message (i, msg);
+			split_message (i, 1, msg);
 	}
 
 	free (msg);
@@ -1173,4 +1211,70 @@ info_message (size_t index, const char *message)
 
 	outrefresh_window (infowin);
 	doupdate ();
+}
+
+/**
+ * add_commentary_chunk:
+ * @chunk: next chunk of commentary.
+ * @last_chunk: true on last chunk.
+ *
+ * Adds @chunk to commentary buffer and displays commentary on the screen if
+ * last_chunk is true.
+ **/
+void
+add_commentary_chunk (const char *chunk, char last_chunk)
+{
+	const size_t new_size = commentary_size + (chunk ? strlen (chunk) : 0);
+
+	if (new_size > commentary_size) {
+		size_t count;
+
+		if (new_size >= commentary_capacity) {
+			const size_t new_capacity = MAX (commentary_capacity * 2, new_size) + 1;
+
+			if (new_capacity > commentary_capacity) {
+				char *new_commentary = realloc (commentary, new_capacity);
+
+				if (new_commentary) {
+					commentary = new_commentary;
+					commentary_capacity = new_capacity;
+				}
+			}
+		}
+		/* commentary_capacity includes terminating 0, while new_size and
+		 * commentary_size don't */
+		count = MIN (new_size, commentary_capacity - 1) - commentary_size;
+		if (count) {
+			memcpy (&commentary[commentary_size], chunk, count + 1);
+			commentary_size += count;
+			assert (commentary_size < commentary_capacity);
+		}
+	}
+	if (! last_chunk)
+		return;
+	commentary_size = right_trim (commentary, commentary_size);
+	if (commentary_size)
+		split_message (info_ring_count, 2, commentary);
+	/* clear commentary buffer */
+	commentary_size = 0;
+
+	if ((! cursed) || (displayed_info_index != info_ring_count))
+		return;
+
+	_update_info ();
+
+	outrefresh_window (infowin);
+	doupdate ();
+}
+
+/**
+ * add_timestamp:
+ * @ts: current timestamp.
+ *
+ * Writes @ts into last_timestamp (for further displaying).
+ **/
+void
+add_timestamp (time_t ts)
+{
+	last_timestamp = ts;
 }

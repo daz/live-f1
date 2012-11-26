@@ -38,10 +38,8 @@ Wishlists:
    driver on the board and use PgUp/PgDn to scroll through the
    history.
 
- * Find somewhere to put the commentary.
-
  * GTK+ ui?
 
- * Client-retranslation server mode; retranslation server should reveive
+ * Client-retranslation server mode; retranslation server should receive
    live timing stream and retranslate it to connected clients with
    various delays.

@@ -27,6 +27,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "crypt.h"
 #include "display.h"
@@ -533,16 +534,30 @@ handle_system_packet (StateModel   *m,
 		info (4, _("\thandle SYS_VALID_MARKER\n"));
 		break;
 	case SYS_COMMENTARY:
-		/* Currently unhandled */
 		info (4, _("\thandle SYS_COMMENTARY\n"));
+		/* Commentary can be divided among several packets;
+		 * each packet has two-byte prefix:
+		 * 0x01 0x00 for first and intermediate chunks,
+		 * 0x01 0x01 for last commentary chunk. */
+		if (packet->len >= 2)
+			add_commentary_chunk ((const char *) &payload[2],
+					      (payload[0] != 1) || (payload[1] != 0));
 		break;
 	case SYS_REFRESH_RATE:
 		/* Currently unhandled */
 		info (4, _("\thandle SYS_REFRESH_RATE\n"));
 		break;
 	case SYS_TIMESTAMP:
-		/* Currently unhandled */
 		info (4, _("\thandle SYS_TIMESTAMP\n"));
+		/* Timestamp is stored as little-endian binary number of
+		 * seconds from the start of an event */
+		if (packet->len > 0) {
+			time_t ts = 0;
+
+			for (i = packet->len; i; --i)
+				ts = (ts << 8) | payload[i - 1];
+			add_timestamp (ts);
+		}
 		break;
 	case SYS_WEATHER:
 		/* Weather Information:

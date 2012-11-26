@@ -699,6 +699,7 @@ print_usage (void)
 		  "  '1'..'9'                   switch verbosity level of displayed\n"
 		  "                             log messages (greater value means\n"
 		  "                             greater verbosity).\n"
+		  "  'c'                        display live commentaries.\n"
 		  "  LEFT, RIGHT, UP, DOWN      move screen.\n"
 		  "  'q', ESC, ENTER            quit.\n"));
 	printf ("\n");
