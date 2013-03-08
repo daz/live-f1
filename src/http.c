@@ -217,6 +217,7 @@ destroy_state_request (StateRequest *sr)
 static void
 do_destroy_state_request (evutil_socket_t sock, short what, void *sr)
 {
+	info (6, _("do_destroy_state_request\n"));
 	destroy_state_request (sr);
 }
 
@@ -231,6 +232,7 @@ start_destroy_state_request (StateRequest *sr)
 {
 	if (! sr)
 		return;
+	info (6, _("start_destroy_state_request\n"));
 	event_base_once (sr->r->base, -1, EV_TIMEOUT, do_destroy_state_request, sr, NULL);
 }
 
@@ -282,8 +284,10 @@ static void
 do_get_auth_cookie (struct evhttp_request *req, void *arg)
 {
 	StateRequest *sr = arg;
-	int           code = evhttp_request_get_response_code (req);
+	int           code;
 
+	info (6, _("do_get_auth_cookie\n"));
+	code = evhttp_request_get_response_code (req);
 	start_destroy_state_request (sr);
 	clear_obtaining_flag (sr->r, OBTAINING_AUTH);
 
@@ -328,6 +332,7 @@ start_get_auth_cookie (StateReader *r)
 
 	info (1, _("Obtaining authentication cookie ...\n"));
 
+	info (6, _("start_get_auth_cookie\n"));
 	sr = create_state_request (r, do_get_auth_cookie, r->auth_host, NULL);
 	if (! sr)
 		return;
@@ -469,9 +474,11 @@ static void
 do_get_decryption_key (struct evhttp_request *req, void *arg)
 {
 	StateRequest *sr = arg;
-	int           code = evhttp_request_get_response_code (req);
+	int           code;
 	int           success = 0;
 
+	info (6, _("do_get_decryption_key\n"));
+	code = evhttp_request_get_response_code (req);
 	start_destroy_state_request (sr);
 	clear_obtaining_flag (sr->r, OBTAINING_KEY);
 
@@ -539,6 +546,7 @@ start_get_decryption_key (StateReader *r)
 	userdata->no = r->new_event_no;
 	userdata->type = r->new_event_type;
 
+	info (6, _("start_get_decryption_key\n"));
 	sr = create_state_request (r, do_get_decryption_key, r->host, userdata);
 	if (! sr) {
 		free (userdata);
@@ -607,8 +615,10 @@ static void
 do_get_key_frame (struct evhttp_request *req, void *arg)
 {
 	StateRequest *sr = arg;
-	int           code = evhttp_request_get_response_code (req);
+	int           code;
 
+	info (6, _("do_get_key_frame\n"));
+	code = evhttp_request_get_response_code (req);
 	start_destroy_state_request (sr);
 	clear_obtaining_flag (sr->r, OBTAINING_FRAME);
 
@@ -647,6 +657,7 @@ start_get_key_frame (StateReader *r)
 	if (! userdata)
 		return;
 	*userdata = r->new_frame;
+	info (6, _("start_get_key_frame\n"));
 	sr = create_state_request (r, do_get_key_frame, r->host, userdata);
 	if (! sr) {
 		free (userdata);
@@ -694,8 +705,10 @@ static void
 do_get_total_laps (struct evhttp_request *req, void *arg)
 {
 	StateRequest *sr = arg;
-	int           code = evhttp_request_get_response_code (req);
+	int           code;
 
+	info (6, _("do_get_total_laps\n"));
+	code = evhttp_request_get_response_code (req);
 	start_destroy_state_request (sr);
 	clear_obtaining_flag (sr->r, OBTAINING_TOTALLAPS);
 
@@ -746,6 +759,7 @@ start_get_total_laps (StateReader *r)
 
 	info (1, _("Obtaining total laps ...\n"));
 
+	info (6, _("start_get_total_laps\n"));
 	sr = create_state_request (r, do_get_total_laps, WEBSERVICE_HOST, NULL);
 	if (! sr)
 		return;

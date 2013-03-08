@@ -147,6 +147,7 @@ read_stream (StateReader *r, struct evbuffer *input, char from_frame)
 static void
 do_read_stream (struct bufferevent *bev, void *r)
 {
+	info (6, _("do_read_stream\n"));
 	read_stream (r, bufferevent_get_input (bev), 0);
 }
 
@@ -161,6 +162,7 @@ static void
 do_write_stream (struct bufferevent *bev, void *r)
 {
 	//TODO: write something to log or delete function
+	info (6, _("do_write_stream\n"));
 }
 
 /**
@@ -172,6 +174,7 @@ do_write_stream (struct bufferevent *bev, void *r)
 static void
 do_reopen_stream (evutil_socket_t sock, short what, void *r)
 {
+	info (6, _("do_reopen_stream\n"));
 	info (1, _("Reconnecting ...\n"));
 	start_getaddrinfo (r);
 }
@@ -185,6 +188,7 @@ do_reopen_stream (evutil_socket_t sock, short what, void *r)
 static void
 start_reopen_stream (StateReader *r)
 {
+	info (6, _("start_reopen_stream\n"));
 	event_base_once (r->base, -1, EV_TIMEOUT, do_reopen_stream, r, NULL);
 }
 
@@ -266,6 +270,7 @@ do_event_stream (struct bufferevent *bev, short what, void *arg)
 	StateReader *r = arg;
 	int          fin = 0;
 
+	info (6, _("do_event_stream\n"));
 	if (what & BEV_EVENT_READING)
 		fin = handle_reading_event (bev, what, r) || fin;
 	if (what & BEV_EVENT_WRITING)
@@ -293,12 +298,14 @@ do_connect_stream (struct bufferevent *bev, short what, void *arg)
 	StateReader *r = arg;
 	int          fin = 0;
 
+	info (6, _("do_connect_stream\n"));
 	if (what & BEV_EVENT_CONNECTED) {
 		/* Ping interval (we shall ping server after last
 		 * server data receiving this time later).
 		 */
 		const struct timeval intrv = {1, 0};
 
+		info (6, _("do_connect_stream (start_ callbacks)\n"));
 		bufferevent_setcb (bev, do_read_stream, do_write_stream, do_event_stream, r);
 		fin = (bufferevent_enable (bev, EV_READ | EV_WRITE) != 0) ||
 		      (bufferevent_set_timeouts (bev, &intrv, NULL) != 0);
@@ -337,6 +344,7 @@ start_connect_stream (StateReader *r)
 		if (bev) {
 			info (3, _("bufferevent was created\n"));
 
+			info (6, _("start_connect_stream\n"));
 			bufferevent_setcb (bev, NULL, NULL, do_connect_stream, r);
 			if (bufferevent_socket_connect (bev, r->addr->ai_addr,
 			                                r->addr->ai_addrlen) == 0)
@@ -365,6 +373,7 @@ do_getaddrinfo (int errcode, struct evutil_addrinfo *res, void *arg)
 {
 	StateReader *r = arg;
 
+	info (6, _("do_getaddrinfo\n"));
 	r->gaireq = NULL;
 	if (errcode) {
 		info (0, "%s: %s: %s: %s\n", program_name,
@@ -402,5 +411,6 @@ start_getaddrinfo (StateReader *r)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = EVUTIL_AI_CANONNAME;
 
+	info (6, _("start_getaddrinfo\n"));
 	r->gaireq = evdns_getaddrinfo (r->dnsbase, r->host, serv, &hints, do_getaddrinfo, r);
 }

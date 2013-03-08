@@ -305,6 +305,7 @@ currentstate_configurate (CurrentState *state,
 static void
 do_loopexit (evutil_socket_t sock, short what, void *base)
 {
+	info (6, _("do_loopexit\n"));
 	event_base_loopexit (base, NULL);
 }
 
@@ -317,6 +318,7 @@ do_loopexit (evutil_socket_t sock, short what, void *base)
 void
 start_loopexit (struct event_base *base)
 {
+	info (6, _("start_loopexit\n"));
 	event_base_once (base, -1, EV_TIMEOUT, do_loopexit, base, NULL); //TODO: lower priority ?
 }
 
@@ -413,10 +415,12 @@ static void
 do_periodic (evutil_socket_t sock, short what, void *arg)
 {
 	CurrentState *state = arg;
-	time_t        ct = time (NULL);
+	time_t        ct;
 	const Packet *packet;
 
-	info (6, _("do_periodic (time=%d)\n"), ct);
+	info (7, _("do_periodic (time=%d) start\n"), ct);
+	ct = time (NULL);
+
 	if (handle_keys (&state->m) < 0) {
 		start_loopexit (state->r.base);
 		return;
@@ -444,6 +448,7 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 		destroy_packet_iterator (&it);
 	}
 	save_data (&state->r);
+	info (7, _("do_periodic (time=%d) final\n"), ct);
 }
 
 /**
@@ -457,6 +462,7 @@ start_periodic (CurrentState *state)
 {
 	const struct timeval intrv = {0, 100000l};
 
+	info (6, _("start_periodic\n"));
 	/* immediate call to initialise CurrentState time_t fields */
 	do_periodic (-1, EV_TIMEOUT, state);
 	state->r.periodic = event_new (state->r.base, -1, EV_PERSIST, do_periodic, state);
