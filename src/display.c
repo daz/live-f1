@@ -187,7 +187,6 @@ open_display (void)
  * @win: window to refresh.
  *
  * Refreshes @win (wnoutrefresh/pnoutrefresh).
- * Doesn't call doupdate.
  **/
 static void
 outrefresh_window (WINDOW *win)
@@ -304,7 +303,7 @@ clear_board (StateModel *m)
 
 	outrefresh_all ();
 
-	doupdate ();
+	update_screen ();
 }
 
 /**
@@ -555,7 +554,7 @@ _update_cell (StateModel *m,
  *
  * Updates a particular cell on the board, with the necessary information
  * available in the model structure. Intended for external code as it
- * updates the display when done.
+ * refreshes the display when done.
  **/
 void
 update_cell (StateModel *m,
@@ -568,8 +567,6 @@ update_cell (StateModel *m,
 	_update_cell (m, car, type);
 
 	outrefresh_window (boardwin);
-
-	doupdate ();
 }
 
 /**
@@ -595,7 +592,7 @@ _update_car (StateModel *m,
  * @m: model structure.
  * @car: car number to update.
  *
- * Update the entire row for the given car, and the display when done.
+ * Update the entire row for the given car, and refresh the display when done.
  **/
 void
 update_car (StateModel *m,
@@ -607,8 +604,6 @@ update_car (StateModel *m,
 	_update_car (m, car);
 
 	outrefresh_window (boardwin);
-
-	doupdate ();
 }
 
 /**
@@ -616,7 +611,7 @@ update_car (StateModel *m,
  * @m: model structure.
  * @car: car number to update.
  *
- * Clears the car from the board, updating the display when done.
+ * Clears the car from the board, refreshing the display when done.
  **/
 void
 clear_car (StateModel *m,
@@ -637,8 +632,6 @@ clear_car (StateModel *m,
 	wclrtoeol (boardwin);
 
 	outrefresh_window (boardwin);
-
-	doupdate ();
 }
 
 /**
@@ -802,7 +795,7 @@ _update_status (StateModel *m)
  * update_status:
  * @m: model structure.
  *
- * Updates the status window, creating it if necessary. Updates the
+ * Updates the status window, creating it if necessary. Refreshes the
  * display when done.
  **/
 void
@@ -811,7 +804,6 @@ update_status (StateModel *m)
 	_update_status (m);
 	outrefresh_window (statwin);
 	outrefresh_window (boardwin);
-	doupdate ();
 }
 
 /**
@@ -866,8 +858,20 @@ update_time (StateModel *m)
 
 	_update_time (m);
 	outrefresh_window (statwin);
+}
 
-	doupdate ();
+/**
+ * update_screen:
+ *
+ * Calls doupdate. Used to minimize screen redrawing.
+ * Should be called after all screen updates or from periodically
+ * triggered function.
+ **/
+void
+update_screen (void)
+{
+	if (cursed)
+		doupdate ();
 }
 
 /**
@@ -931,14 +935,12 @@ handle_keys (StateModel *m)
 		return -1;
 	case KEY_RESIZE:
 		outrefresh_all ();
-		doupdate ();
 		return 1;
 	case KEY_LEFT:
 		if (startx > 0) {
 			--startx;
 			outrefresh_window (boardwin);
 			outrefresh_window (infowin);
-			doupdate ();
 		}
 		return 1;
 	case KEY_RIGHT:
@@ -946,21 +948,18 @@ handle_keys (StateModel *m)
 			++startx;
 			outrefresh_window (boardwin);
 			outrefresh_window (infowin);
-			doupdate ();
 		}
 		return 1;
 	case KEY_UP:
 		if (starty > 0) {
 			--starty;
 			outrefresh_all ();
-			doupdate ();
 		}
 		return 1;
 	case KEY_DOWN:
 		if (starty + 1 < nlines) {
 			++starty;
 			outrefresh_all ();
-			doupdate ();
 		}
 		return 1;
 	case 'i':
@@ -1008,7 +1007,6 @@ handle_keys (StateModel *m)
 			displayed_info_index = new_disp_info_index;
 			_update_info ();
 			outrefresh_window (infowin);
-			doupdate ();
 		}
 		return 1;
 	case 'c':
@@ -1017,7 +1015,6 @@ handle_keys (StateModel *m)
 			displayed_info_index = info_ring_count;
 			_update_info ();
 			outrefresh_window (infowin);
-			doupdate ();
 		}
 		return 1;
 	default:
@@ -1210,7 +1207,6 @@ info_message (size_t index, const char *message)
 	_update_info ();
 
 	outrefresh_window (infowin);
-	doupdate ();
 }
 
 /**
@@ -1264,7 +1260,6 @@ add_commentary_chunk (const char *chunk, char last_chunk)
 	_update_info ();
 
 	outrefresh_window (infowin);
-	doupdate ();
 }
 
 /**

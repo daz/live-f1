@@ -448,6 +448,8 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 		destroy_packet_iterator (&it);
 	}
 	save_data (&state->r);
+
+	update_screen ();
 	info (7, _("do_periodic (time=%d) final\n"), ct);
 }
 

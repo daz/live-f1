@@ -46,6 +46,19 @@ equal to one packet size.
 
 Cache file should be replaced by sqlite database in future versions.
 
+Screen drawing
+--------------
+
+These functions are defined at src/display.c. Each external function declared
+at src/display.h which name starts with "update_" (except update_screen) has
+internal counterpart (which name starts with "_update_"). Internal function
+makes real work without refreshing virtual screen; external function calls
+internal one and refreshes virtual screen. Real screen updating (see
+description of wnoutrefresh/pnoutrefresh and doupdate functions in ncurses)
+takes place in update_screen function that is called from clear_board and
+do_periodic (src/main.c) only. This solution is chosen to minimize the number
+of real screen updates.
+
 Asynchronous code flow (basic functions)
 ----------------------------------------
 
