@@ -41,7 +41,7 @@
 
 
 /* Forward prototypes */
-static void start_open_stream ();
+static void start_connect_stream ();
 
 
 /**
@@ -285,7 +285,7 @@ do_event_stream (struct bufferevent *bev, short what, void *arg)
  *
  * bufferevent connect callback (see bufferevent_event_cb).
  * Enables reading and writing on successful connection,
- * calls start_open_stream for next attempt on failed connection.
+ * calls start_connect_stream for next attempt on failed connection.
  **/
 static void
 do_connect_stream (struct bufferevent *bev, short what, void *arg)
@@ -311,12 +311,12 @@ do_connect_stream (struct bufferevent *bev, short what, void *arg)
 	} else {
 		bufferevent_free (bev);
 		info (3, _("bufferevent was destroyed\n"));
-		start_open_stream (r);
+		start_connect_stream (r);
 	}
 }
 
 /**
- * start_open_stream:
+ * start_connect_stream:
  * @r: stream reader structure.
  *
  * Attempts to make a connection to next address in addresses list.
@@ -324,7 +324,7 @@ do_connect_stream (struct bufferevent *bev, short what, void *arg)
  * (they will be enabled at do_connect_stream after successful connection).
  **/
 static void
-start_open_stream (StateReader *r)
+start_connect_stream (StateReader *r)
 {
 	struct bufferevent *bev;
 
@@ -358,7 +358,7 @@ start_open_stream (StateReader *r)
  * @arg: stream reader structure.
  *
  * evdns_getaddrinfo callback.
- * Calls start_open_stream for first address in @res on success.
+ * Calls start_connect_stream for first address in @res on success.
  **/
 static void
 do_getaddrinfo (int errcode, struct evutil_addrinfo *res, void *arg)
@@ -378,7 +378,7 @@ do_getaddrinfo (int errcode, struct evutil_addrinfo *res, void *arg)
 			evutil_freeaddrinfo (r->addr_head);
 		r->addr_head = res;
 		r->addr = NULL;
-		start_open_stream (r);
+		start_connect_stream (r);
 	}
 }
 

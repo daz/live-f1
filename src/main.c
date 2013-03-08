@@ -464,7 +464,7 @@ start_periodic (CurrentState *state)
 }
 
 /**
- * start_reading_process:
+ * initiate_reading_process:
  * @r: stream reader structure.
  * @m: model structure.
  *
@@ -473,7 +473,7 @@ start_periodic (CurrentState *state)
  * initialises StateModel::replay_gap for replay mode.
  **/
 static void
-start_reading_process (StateReader *r, StateModel *m)
+initiate_reading_process (StateReader *r, StateModel *m)
 {
 	if (! r->replay_mode) {
 		start_get_auth_cookie (r);
@@ -571,7 +571,7 @@ main (int   argc,
 	}
 
 	if (currentstate_configurate (&state, home_dir, save_file) == 0) {
-		start_reading_process (&state.r, &state.m);
+		initiate_reading_process (&state.r, &state.m);
 		start_periodic (&state);
 		event_base_dispatch (state.r.base);
 	} else

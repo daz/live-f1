@@ -1,0 +1,77 @@
+Source code architecture description
+------------------------------------
+
+live-f1 uses libevent (asynchronous callbacks library) for network
+communications and ncurses for in-terminal screen drawing.
+
+Common data structures are defined at src/live-f1.h. Program state structure
+(CurrentState) is divided in two parts - StateReader and StateModel.
+StateReader saves data packets received from live timing server (without
+decryption, it only unpacks them) to cache/replay file;
+StateModel decrypts data retrieved from cache and is used for displaying.
+Cache file (see src/packetcache.c) is used for replay functionality and
+for delay implementation - StateReader writes packets to cache's tail, while
+StateModel obtains them from its body (see StateModel::iter).
+Such splitting (StateReader/StateModel) can be used in case of
+client-retranslation server mode, where several clients connect to one
+retranslation server and use various delays (each client has associated
+StateModel structure) - such feature may be implemented in future versions.
+
+Asynchronous-related function names come within the following naming
+convention: initiator function name starts with "start_" prefix,
+callback name starts with "do_" prefix and has same main name part as
+related initiator (except in some situations where one initiator initiates
+several callbacks).
+
+live-f1 uses the following method to block simultaneous requests: every
+function that needs data from other source than live timing server (they are
+declared at src/http.h) checks that associated obtaining flag (see
+StateReader::obtaining) was not set; if so, then this function continues
+execution and initiates asynchronous request, otherwise it stops. This flag
+will be cleared at callback. But requests of different types can be in progress
+simultaneously, except one special case: if start_get_decryption_key is called
+when authentication cookie obtaining is in progress, then decryption key
+request becomes pending (see StateReader::pending) and it will be unfreezed
+at do_get_auth_cookie callback (start_pending_requests call).
+
+Cache/replay file format
+------------------------
+
+Cache file contains binary array of unpacked data packets with receiving
+timestamp (see Packet at src/packetdef.h). Packet stream can contain
+user-defined packets (values with "USER_" prefix at SystemPacketType enum)
+that aren't received from the live timing server. Cache file has version
+signature (see version_signature at src/packetcache.c); it holds space
+equal to one packet size.
+
+Cache file should be replaced by sqlite database in future versions.
+
+Asynchronous code flow (basic functions)
+----------------------------------------
+
+main (src/main.c):
+	calls initiate_reading_process,
+	      start_periodic
+start_periodic (src/main.c):
+	initiates do_periodic callback
+do_periodic (src/main.c):
+	periodically triggered timeout callback
+initiate_reading_process (src/main.c):
+	calls start_get_auth_cookie,
+	      start_getaddrinfo
+
+start_getaddrinfo (src/stream.c):
+	initiates do_getaddrinfo callback
+do_getaddrinfo (src/stream.c):
+	calls start_connect_stream
+start_connect_stream (src/stream.c):
+	initiates do_connect_stream callback
+do_connect_stream (src/stream.c):
+	calls start_connect_stream (on failed connection),
+	initiates do_read_stream, do_write_stream, do_event_stream callbacks
+
+start_get_auth_cookie (src/http.c):
+	initiates do_get_auth_cookie callback
+do_get_auth_cookie (src/http.c):
+	calls start_get_auth_cookie (on error),
+	      start_pending_requests
