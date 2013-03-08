@@ -708,7 +708,8 @@ do_get_total_laps (struct evhttp_request *req, void *arg)
 	int           code;
 
 	info (6, _("do_get_total_laps\n"));
-	code = evhttp_request_get_response_code (req);
+	code = 404; //TODO: temporary bugfix
+//	code = evhttp_request_get_response_code (req);
 	start_destroy_state_request (sr);
 	clear_obtaining_flag (sr->r, OBTAINING_TOTALLAPS);
 
