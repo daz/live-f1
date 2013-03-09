@@ -25,6 +25,7 @@
 
 
 #include <assert.h>
+#include <regex.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -314,7 +315,7 @@ push_key_packet (StateReader *r)
  * @from_frame: true if @packet was received from key frame.
  *
  * Pre-handling of the system packet.
- * Initiates querying a decryption key, total laps or new key frame
+ * Initiates querying a decryption key or new key frame
  * if required.
  *
  * Returns: 1 if @packet must be pushed to the @r->encrypted_cnum cache,
@@ -350,7 +351,6 @@ pre_handle_system_packet (StateReader  *r,
 		r->new_event_no = number;
 		r->new_event_type = packet->data;
 		start_get_decryption_key (r);
-		start_get_total_laps (r);
 
 		break;
 	case SYS_KEY_FRAME:
@@ -489,6 +489,69 @@ write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher)
 }
 
 /**
+ * extract_total_laps:
+ * @m: model structure.
+ * @text: commentary to extract laps from.
+ *
+ * Tries to extract total laps number from @text. Saves result to
+ * @m->total_laps on success.
+ **/
+static void
+extract_total_laps (StateModel *m, const char *text)
+{
+	char            numtext[12];
+	long long       laps;
+	static regex_t *re[2] = {NULL, NULL};
+	regmatch_t      pm[4];
+
+	if ((! m) || (! text))
+		return;
+
+	if (! re[0]) {
+		re[0] = malloc (sizeof (*re[0]));
+		if (! re[0])
+			return;
+		regcomp(re[0], "Lap *([0-9]+)([^0-9]| *of *)([0-9]+)", REG_EXTENDED|REG_ICASE);
+	}
+	if (! re[1]) {
+		re[1] = malloc (sizeof (*re[1]));
+		if (! re[1])
+			return;
+		regcomp(re[1], "^Welcome .* ([0-9]+) +laps", REG_EXTENDED|REG_ICASE);
+	}
+
+	if (regexec(re[0], text, 4, pm, 0) == 0) {
+		if ((pm[1].rm_eo <= pm[1].rm_so) ||
+		    (pm[1].rm_eo - pm[1].rm_so > sizeof (numtext) - 1) ||
+		    (pm[3].rm_eo <= pm[3].rm_so) ||
+		    (pm[3].rm_eo - pm[3].rm_so > sizeof (numtext) - 1))
+			return;
+		memcpy (numtext, &text[pm[1].rm_so], pm[1].rm_eo - pm[1].rm_so);
+		numtext[pm[1].rm_eo - pm[1].rm_so] = 0;
+		laps = atoll (numtext);
+		if ((laps != m->laps_completed) && (laps != m->laps_completed + 1))
+			return;
+		memcpy (numtext, &text[pm[3].rm_so], pm[3].rm_eo - pm[3].rm_so);
+		numtext[pm[3].rm_eo - pm[3].rm_so] = 0;
+	}
+	else if (regexec(re[1], text, 2, pm, 0) == 0) {
+		if ((pm[1].rm_eo <= pm[1].rm_so) ||
+		    (pm[1].rm_eo - pm[1].rm_so > sizeof (numtext) - 1))
+			return;
+		memcpy (numtext, &text[pm[1].rm_so], pm[1].rm_eo - pm[1].rm_so);
+		numtext[pm[1].rm_eo - pm[1].rm_so] = 0;
+	}
+	else
+		return;
+
+	laps = atoll (numtext);
+	if (m->total_laps == laps)
+		return;
+	m->total_laps = laps;
+	update_status (m);
+}
+
+/**
  * handle_system_packet:
  * @m: model structure.
  * @packet: encoded packet structure.
@@ -539,9 +602,14 @@ handle_system_packet (StateModel   *m,
 		 * each packet has two-byte prefix:
 		 * 0x01 0x00 for first and intermediate chunks,
 		 * 0x01 0x01 for last commentary chunk. */
-		if (packet->len >= 2)
-			add_commentary_chunk ((const char *) &payload[2],
-					      (payload[0] != 1) || (payload[1] != 0));
+		if (packet->len >= 2) {
+			const char *commentary = add_commentary_chunk ((const char *) &payload[2]);
+
+			if ((payload[0] != 1) || (payload[1] != 0)) {
+				extract_total_laps (m, commentary);
+				display_commentary ();
+			}
+		}
 		break;
 	case SYS_REFRESH_RATE:
 		/* Currently unhandled */
@@ -743,7 +811,7 @@ handle_system_packet (StateModel   *m,
 		break;
 	case USER_SYS_TOTAL_LAPS:
 		info (4, _("\thandle USER_SYS_TOTAL_LAPS\n"));
-		m->total_laps = packet->data;
+		/* Obsoleted packet type */
 		break;
 	case USER_SYS_KEY:
 		info (4, _("\thandle USER_SYS_KEY\n"));

@@ -28,7 +28,6 @@ SJR_BEGIN_EXTERN
 void start_get_auth_cookie    (StateReader *r);
 void start_get_decryption_key (StateReader *r);
 void start_get_key_frame      (StateReader *r);
-void start_get_total_laps     (StateReader *r);
 
 SJR_END_EXTERN
 

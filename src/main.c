@@ -418,8 +418,9 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 	time_t        ct;
 	const Packet *packet;
 
-	info (7, _("do_periodic (time=%d) start\n"), ct);
+	info (7, _("do_periodic start\n"));
 	ct = time (NULL);
+	info (7, _("time=%d\n"), ct);
 
 	if (handle_keys (&state->m) < 0) {
 		start_loopexit (state->r.base);
@@ -450,7 +451,7 @@ do_periodic (evutil_socket_t sock, short what, void *arg)
 	save_data (&state->r);
 
 	update_screen ();
-	info (7, _("do_periodic (time=%d) final\n"), ct);
+	info (7, _("do_periodic final\n"));
 }
 
 /**

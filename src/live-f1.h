@@ -31,9 +31,8 @@
 #include "macros.h"
 #include "packetcache.h"
 
-/* Default hostnames to contact */
+/* Default hostname to contact */
 #define DEFAULT_HOST      "live-timing.formula1.com"
-#define WEBSERVICE_HOST   "live-f1.puseyuk.co.uk"
 
 /* Make gettext a little friendlier */
 #define _(_str) gettext (_str)
@@ -77,7 +76,7 @@ typedef enum {
 	OBTAINING_CONNECT   = 2, /* reserved */
 	OBTAINING_FRAME     = 4,
 	OBTAINING_KEY       = 8,
-	OBTAINING_TOTALLAPS = 16,
+	OBTAINING_TOTALLAPS = 16, /* reserved */
 	OBTAINING_ALL       = 31,
 	OBTAINING_LAST      = 32
 } ObtainingStatus;

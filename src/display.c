@@ -705,7 +705,7 @@ _update_status (StateModel *m)
 	case RACE_EVENT:
 		switch (m->total_laps - m->laps_completed) {
 		case 0:
-			wprintw (statwin, "%10s", "FINISHED");
+			wprintw (statwin, "%10s", m->total_laps ? "FINISHED" : "?? TO GO");
 			break;
 		case 1:
 			wprintw (statwin, "%10s", "FINAL LAP");
@@ -1212,13 +1212,13 @@ info_message (size_t index, const char *message)
 /**
  * add_commentary_chunk:
  * @chunk: next chunk of commentary.
- * @last_chunk: true on last chunk.
  *
- * Adds @chunk to commentary buffer and displays commentary on the screen if
- * last_chunk is true.
+ * Adds @chunk to commentary buffer.
+ *
+ * Returns: pointer to commentary buffer.
  **/
-void
-add_commentary_chunk (const char *chunk, char last_chunk)
+const char *
+add_commentary_chunk (const char *chunk)
 {
 	const size_t new_size = commentary_size + (chunk ? strlen (chunk) : 0);
 
@@ -1246,8 +1246,17 @@ add_commentary_chunk (const char *chunk, char last_chunk)
 			assert (commentary_size < commentary_capacity);
 		}
 	}
-	if (! last_chunk)
-		return;
+	return commentary;
+}
+
+/**
+ * display_commentary:
+ *
+ * Displays commentary buffer's content on the screen.
+ **/
+void
+display_commentary (void)
+{
 	commentary_size = right_trim (commentary, commentary_size);
 	if (commentary_size)
 		split_message (info_ring_count, 2, commentary);

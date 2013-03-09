@@ -252,8 +252,6 @@ start_pending_requests (StateReader *r, int mask)
 		start_get_key_frame (r);
 	if (r->pending & mask & OBTAINING_KEY)
 		start_get_decryption_key (r);
-	if (r->pending & mask & OBTAINING_TOTALLAPS)
-		start_get_total_laps (r);
 	r->pending &= ~mask;
 }
 
@@ -692,96 +690,15 @@ start_get_key_frame (StateReader *r)
 }
 
 /**
- * do_get_total_laps:
- * @req: libevent's evhttp_request.
- * @arg: HTTP request structure.
- *
- * start_get_total_laps callback.
- * Retrieves total laps from the response, adds USER_SYS_TOTAL_LAPS packet
- * to the packet cache and calls continue_pre_handle_stream on
- * success response.
- **/
-static void
-do_get_total_laps (struct evhttp_request *req, void *arg)
-{
-	StateRequest *sr = arg;
-	int           code;
-
-	info (6, _("do_get_total_laps\n"));
-	code = 404; //TODO: temporary bugfix
-//	code = evhttp_request_get_response_code (req);
-	start_destroy_state_request (sr);
-	clear_obtaining_flag (sr->r, OBTAINING_TOTALLAPS);
-
-	if (is_valid_http_response_code (code)) {
-		StateRequestResult *res;
-
-		info (2, _("Total laps obtained\n"));
-		res = create_sr_result (sr, req);
-		if (res) {
-			unsigned int        total_laps;
-			Packet              tlp;
-
-			parse_sr_result (&total_laps, res, parse_dec_number);
-			tlp.car = 0;
-			tlp.type = USER_SYS_TOTAL_LAPS;
-			tlp.data = total_laps;
-			tlp.len = 0;
-			tlp.at = sr->r->saving_time;
-			push_packet (sr->r->encrypted_cnum, &tlp); //TODO: check errors
-			info (3, _("Got total laps: %u\n"), total_laps);
-
-			continue_pre_handle_stream (sr->r);
-
-			destroy_sr_result (res);
-		}
-	} else
-		info (0, "%s: %s: %s %d\n", program_name,
-		      _("total laps request failed"),
-		      _("HTTP response code"), code);
-	//TODO: try again on error ?
-	start_pending_requests (sr->r, OBTAINING_ALL);
-}
-
-/**
- * start_get_total_laps:
- * @r: stream reader structure.
- *
- * Initiates obtaining the total number of laps for the race.
- * Total laps will be obtained in callback (do_get_total_laps).
- **/
-void
-start_get_total_laps (StateReader *r)
-{
-	StateRequest *sr;
-
-	if (r->obtaining & OBTAINING_TOTALLAPS)
-		return;
-
-	info (1, _("Obtaining total laps ...\n"));
-
-	info (6, _("start_get_total_laps\n"));
-	sr = create_state_request (r, do_get_total_laps, WEBSERVICE_HOST, NULL);
-	if (! sr)
-		return;
-
-	if (evhttp_make_request (sr->conn, sr->req,
-			         EVHTTP_REQ_GET, "/laps.php")) {
-		info (0, "%s: %s\n", program_name,
-		      _("total laps request failed"));
-		destroy_state_request (sr);
-	} else
-		r->obtaining |= OBTAINING_TOTALLAPS;
-}
-
-/**
  * parse_dec_number:
  * @num: pointer to store result in.
  * @buf: buffer containing data received from server.
  * @len: length of buffer.
  *
- * Parses data received from the server in response to the total laps request,
+ * Parses data received from the server,
  * filling the result while we can see decimal digits.
+ *
+ * Function is not used currently.
  **/
 static void
 parse_dec_number (unsigned int *num,

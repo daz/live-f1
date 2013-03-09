@@ -44,7 +44,8 @@ void update_status (StateModel *m);
 void update_time   (StateModel *m);
 
 void info_message (size_t index, const char *message);
-void add_commentary_chunk (const char *chunk, char last_chunk);
+const char * add_commentary_chunk (const char *chunk);
+void display_commentary (void);
 void add_timestamp (time_t ts);
 
 SJR_END_EXTERN
