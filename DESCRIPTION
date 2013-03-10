@@ -17,6 +17,39 @@ client-retranslation server mode, where several clients connect to one
 retranslation server and use various delays (each client has associated
 StateModel structure) - such feature may be implemented in future versions.
 
+StateReader uses functions which names contain "pre_handle_"
+(continue_pre_handle_stream, pre_handle_packet etc.) to scan packets and make
+specific immediate actions (e.g., pre_handle_system_packet may initiate
+key frame request on SYS_KEY_FRAME packet) that can modify cache. These
+functions are not called in replay mode.
+StateModel uses functions which names start with "handle_" to decrypt packet
+and change itself; these functions may be delayed (after the reading)
+and they cannot modify cache.
+
+Reading process uses two distinct caches which numbers are
+StateReader::input_cnum and StateReader::encrypted_cnum. Second cache is common
+(StateModel receives packets from it). First one is used as temporary buffer
+for stream packets while key frame request is in progress - requested key frame
+content must replace SYS_KEY_FRAME packet in encrypted_cnum cache
+(packets from key frame are pre-handled and written to encrypted_cnum
+immediately; packets from live stream are written to input_cnum, then (see
+continue_pre_handle_stream) they are pre-handled and written to encrypted_cnum
+if key frame request is not in progress, or wait otherwise).
+
+Delay implementation uses variables StateModel::replay_gap,
+StateModel::time_gap, StateModel::model_time.
+First one is difference between race time and real-world time (replay_gap is 0
+in live mode).
+Second one is delay itself - wanted gap between packet "pure" visualization
+time (as if there were no delay; it is equal to real packet receiving time in
+live mode) and real-world time.
+StateModel::model_time is virtual time (program visualizes race state at
+this time moment); this one tends to the value
+<real_world_time> - (time_gap + replay_gap)
+but may not be equal to it (see update_model_time).
+Delay implementation cannot rewind visualization (model_time cannot decrease)
+in the current version.
+
 Asynchronous-related function names come within the following naming
 convention: initiator function name starts with "start_" prefix,
 callback name starts with "do_" prefix and has same main name part as
@@ -24,7 +57,7 @@ related initiator (except in some situations where one initiator initiates
 several callbacks).
 
 live-f1 uses the following method to block simultaneous requests: every
-function that needs data from other source than live timing server (they are
+function that needs data from other source than live stream server (they are
 declared at src/http.h) checks that associated obtaining flag (see
 StateReader::obtaining) was not set; if so, then this function continues
 execution and initiates asynchronous request, otherwise it stops. This flag

@@ -24,8 +24,9 @@ To compile live-f1 you'll need both installed.
 	* libevent 2.0.4 or later
 
 For detailed compilation and installation instructions see the INSTALL
-file, if you've checked live-f1 out from revision control or want to
-hack on live-f1, see the HACKING file.
+file; if you've checked live-f1 out from revision control or want to
+hack on live-f1, see the HACKING file; for source code architecture
+description and some source code solutions explanation see DESCRIPTION.
 
 
 Usage
