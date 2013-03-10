@@ -42,22 +42,22 @@
 #define KEYFRAME_URL_PREFIX "/keyframe"
 
 
-//TODO: description
+/* HTTP request structure (one request per connection) */
 typedef struct {
 	StateReader              *r;
 	struct evhttp_connection *conn;
 	struct evhttp_request    *req;
 	void                     *userdata;
-} StateRequest;
+} HTTPRequest;
 
-//TODO: description
+/* HTTP request result (response) */
 typedef struct {
 	StateReader     *r;
 	struct evbuffer *response;
 	void            *userdata;
-} StateRequestResult;
+} HTTPRequestResult;
 
-//TODO: description
+/* Event number and event type (race/qualifying/practice) */
 typedef struct {
 	unsigned int no;
 	EventType    type;
@@ -145,7 +145,7 @@ get_host_and_port (const char *hostname, char **fullname, int *port)
 }
 
 /**
- * create_state_request:
+ * create_http_request:
  * @r: stream reader structure.
  * @cb: request callback.
  * @host: host to request.
@@ -156,87 +156,96 @@ get_host_and_port (const char *hostname, char **fullname, int *port)
  * Returns: pointer to newly allocated request structure
  * or NULL on failure.
  **/
-static StateRequest *
-create_state_request (StateReader  *r,
-                      void        (*cb) (struct evhttp_request *, void *),
-                      const char   *host,
-		      void         *userdata)
+static HTTPRequest *
+create_http_request (StateReader  *r,
+                     void        (*cb) (struct evhttp_request *, void *),
+                     const char   *host,
+                     void         *userdata)
 {
-	StateRequest *sr = malloc (sizeof (*sr));
-	if (sr) {
+	HTTPRequest *hr = malloc (sizeof (*hr));
+	if (hr) {
 		char   *fullhostname;
 		int     port;
 
 		if (get_host_and_port (host, &fullhostname, &port) == 0) {
-			sr->r = r;
-			sr->userdata = userdata;
-			sr->conn = evhttp_connection_base_new (r->base, r->dnsbase, fullhostname, port);
-			if (sr->conn) {
-				sr->req = evhttp_request_new (cb, sr);
-				if (sr->req) {
-					evhttp_add_header (evhttp_request_get_output_headers (sr->req),
+			hr->r = r;
+			hr->userdata = userdata;
+			hr->conn = evhttp_connection_base_new (r->base, r->dnsbase, fullhostname, port);
+			if (hr->conn) {
+				hr->req = evhttp_request_new (cb, hr);
+				if (hr->req) {
+					evhttp_add_header (evhttp_request_get_output_headers (hr->req),
 							   "Host", host);
-					evhttp_add_header (evhttp_request_get_output_headers (sr->req),
+					evhttp_add_header (evhttp_request_get_output_headers (hr->req),
 							   "User-Agent", PACKAGE_STRING);
-					return sr;
+					return hr;
 				}
-				evhttp_connection_free (sr->conn);
+				evhttp_connection_free (hr->conn);
 			}
 			free (fullhostname);
 		}
-		free (sr);
+		free (hr);
 	}
 	free (userdata);
 	return NULL;
 }
 
 /**
- * destroy_state_request:
- * @sr: HTTP request structure.
+ * destroy_http_request:
+ * @hr: HTTP request structure.
  *
- * Destroys @sr.
+ * Destroys @hr.
  **/
 static void
-destroy_state_request (StateRequest *sr)
+destroy_http_request (HTTPRequest *hr)
 {
-	if (! sr)
+	if (! hr)
 		return;
-	if (sr->conn)
-		evhttp_connection_free (sr->conn);
-	free (sr->userdata);
-	free (sr);
+	if (hr->conn)
+		evhttp_connection_free (hr->conn);
+	free (hr->userdata);
+	free (hr);
 }
 
 /**
- * do_destroy_state_request:
- * @sr: HTTP request structure.
+ * do_destroy_http_request:
+ * @hr: HTTP request structure.
  *
- * Destroys @sr.
- * Delegates execution to destroy_state_request.
+ * Destroys @hr.
+ * Delegates execution to destroy_http_request.
  **/
 static void
-do_destroy_state_request (evutil_socket_t sock, short what, void *sr)
+do_destroy_http_request (evutil_socket_t sock, short what, void *hr)
 {
-	info (6, _("do_destroy_state_request\n"));
-	destroy_state_request (sr);
+	info (6, _("do_destroy_http_request\n"));
+	destroy_http_request (hr);
 }
 
 /**
- * start_destroy_state_request:
- * @sr: HTTP request structure.
+ * start_destroy_http_request:
+ * @hr: HTTP request structure.
  *
- * Deferred @sr destroying.
+ * Deferred @hr destroying.
  **/
 static void
-start_destroy_state_request (StateRequest *sr)
+start_destroy_http_request (HTTPRequest *hr)
 {
-	if (! sr)
+	if (! hr)
 		return;
-	info (6, _("start_destroy_state_request\n"));
-	event_base_once (sr->r->base, -1, EV_TIMEOUT, do_destroy_state_request, sr, NULL);
+	info (6, _("start_destroy_http_request\n"));
+	event_base_once (hr->r->base, -1, EV_TIMEOUT, do_destroy_http_request, hr, NULL);
 }
 
-//TODO: description
+/**
+ * start_pending_requests:
+ * @r: stream reader structure.
+ * @mask: pending mask (bitwise OR combination of pending requests
+ * that can be initiated).
+ *
+ * Starts pending requests.
+ * Decryption key request becomes pending when authentication request is
+ * in progress - this function unfreezes it.
+ **/
 static void
 start_pending_requests (StateReader *r, int mask)
 {
@@ -255,7 +264,14 @@ start_pending_requests (StateReader *r, int mask)
 	r->pending &= ~mask;
 }
 
-//TODO: description
+/**
+ * clear_obtaining_flag:
+ * @r: stream reader structure.
+ * @flag: request type flag.
+ *
+ * Clears request type flag. Used in callbacks and indicates that request
+ * process is finished.
+ **/
 static void
 clear_obtaining_flag (StateReader *r, int flag)
 {
@@ -281,13 +297,13 @@ clear_obtaining_flag (StateReader *r, int flag)
 static void
 do_get_auth_cookie (struct evhttp_request *req, void *arg)
 {
-	StateRequest *sr = arg;
-	int           code;
+	HTTPRequest *hr = arg;
+	int          code;
 
 	info (6, _("do_get_auth_cookie\n"));
 	code = evhttp_request_get_response_code (req);
-	start_destroy_state_request (sr);
-	clear_obtaining_flag (sr->r, OBTAINING_AUTH);
+	start_destroy_http_request (hr);
+	clear_obtaining_flag (hr->r, OBTAINING_AUTH);
 
 	if (! is_valid_http_response_code (code))
 		info (0, "%s: %s: %s %d\n", program_name,
@@ -297,18 +313,18 @@ do_get_auth_cookie (struct evhttp_request *req, void *arg)
 		const char *header = evhttp_find_header (evhttp_request_get_input_headers (req),
 		                                         "Set-Cookie");
 		if (header)
-			parse_cookie_hdr (&sr->r->cookie, header);
+			parse_cookie_hdr (&hr->r->cookie, header);
 	}
 
 	if (! is_valid_http_response_code (code))
-		start_get_auth_cookie (sr->r);
-	else if (sr->r->cookie) {
+		start_get_auth_cookie (hr->r);
+	else if (hr->r->cookie) {
 		info (2, _("Authentication cookie obtained\n"));
-		start_pending_requests (sr->r, OBTAINING_KEY);
+		start_pending_requests (hr->r, OBTAINING_KEY);
 	} else
 		info (0, "%s: %s\n", program_name,
 		      _("login failed: check email and password in ~/.f1rc"));
-	start_pending_requests (sr->r, OBTAINING_ALL & ~OBTAINING_KEY);
+	start_pending_requests (hr->r, OBTAINING_ALL & ~OBTAINING_KEY);
 }
 
 /**
@@ -322,8 +338,8 @@ do_get_auth_cookie (struct evhttp_request *req, void *arg)
 void
 start_get_auth_cookie (StateReader *r)
 {
-	StateRequest *sr;
-	char         *email, *password;
+	HTTPRequest *hr;
+	char        *email, *password;
 
 	if (r->obtaining & OBTAINING_AUTH)
 		return;
@@ -331,24 +347,24 @@ start_get_auth_cookie (StateReader *r)
 	info (1, _("Obtaining authentication cookie ...\n"));
 
 	info (6, _("start_get_auth_cookie\n"));
-	sr = create_state_request (r, do_get_auth_cookie, r->auth_host, NULL);
-	if (! sr)
+	hr = create_http_request (r, do_get_auth_cookie, r->auth_host, NULL);
+	if (! hr)
 		return;
-	evhttp_add_header (evhttp_request_get_output_headers (sr->req), "Content-Type",
+	evhttp_add_header (evhttp_request_get_output_headers (hr->req), "Content-Type",
 			   "application/x-www-form-urlencoded");
 
 	/* Encode the e-mail and password as a form */
 	email = evhttp_encode_uri (r->email);
 	password = evhttp_encode_uri (r->password);
 	if (email && password)
-		evbuffer_add_printf (evhttp_request_get_output_buffer (sr->req),
+		evbuffer_add_printf (evhttp_request_get_output_buffer (hr->req),
 		                     "email=%s&password=%s", email, password);
 
-	if (! email || ! password || evhttp_make_request (sr->conn, sr->req,
+	if (! email || ! password || evhttp_make_request (hr->conn, hr->req,
 				                          EVHTTP_REQ_POST, LOGIN_URL)) {
 		info (0, "%s: %s\n", program_name,
 		      _("login request failed"));
-		destroy_state_request (sr);
+		destroy_http_request (hr);
 	} else {
 		r->obtaining |= OBTAINING_AUTH;
 	}
@@ -385,14 +401,14 @@ parse_cookie_hdr (char       **value,
 }
 
 /**
- * destroy_sr_result:
+ * destroy_hr_result:
  * @res: HTTP request result.
  *
  * Destroys @res.
  * Frees @res->userdata.
  **/
 static void
-destroy_sr_result (StateRequestResult *res)
+destroy_hr_result (HTTPRequestResult *res)
 {
 	if (! res)
 		return;
@@ -403,8 +419,8 @@ destroy_sr_result (StateRequestResult *res)
 }
 
 /**
- * create_sr_result:
- * @sr: HTTP request.
+ * create_hr_result:
+ * @hr: HTTP request.
  * @req: libevent's evhttp_request.
  *
  * Creates and initialises HTTP request result.
@@ -412,26 +428,26 @@ destroy_sr_result (StateRequestResult *res)
  * Returns: pointer to newly allocated HTTP request result structure
  * or NULL on failure.
  **/
-static StateRequestResult *
-create_sr_result (StateRequest *sr, struct evhttp_request *req)
+static HTTPRequestResult *
+create_hr_result (HTTPRequest *hr, struct evhttp_request *req)
 {
-	StateRequestResult *res = malloc (sizeof (*res));
+	HTTPRequestResult *res = malloc (sizeof (*res));
 
 	if (! res)
 		return NULL;
 
-	res->r = sr->r;
+	res->r = hr->r;
 	res->response = evbuffer_new ();
 	evbuffer_add_buffer (res->response, evhttp_request_get_input_buffer (req));
 
-	res->userdata = sr->userdata;
-	sr->userdata = NULL;
+	res->userdata = hr->userdata;
+	hr->userdata = NULL;
 
 	return res;
 }
 
 /**
- * parse_sr_result:
+ * parse_hr_result:
  * @number[out]: number to save parsing result.
  * @res[in]: HTTP request result structure.
  * @parser[in]: parse function.
@@ -443,9 +459,9 @@ create_sr_result (StateRequest *sr, struct evhttp_request *req)
  * next times if HTTP response doesn't stores in one contiguous chain.
  **/
 static void
-parse_sr_result (unsigned int        *number,
-                 StateRequestResult  *res,
-		 void               (*parser) (unsigned int *, const char *, size_t))
+parse_hr_result (unsigned int       *number,
+                 HTTPRequestResult  *res,
+                 void              (*parser) (unsigned int *, const char *, size_t))
 {
 	unsigned int num = 0;
 
@@ -471,44 +487,44 @@ parse_sr_result (unsigned int        *number,
 static void
 do_get_decryption_key (struct evhttp_request *req, void *arg)
 {
-	StateRequest *sr = arg;
-	int           code;
-	int           success = 0;
+	HTTPRequest *hr = arg;
+	int          code;
+	int          success = 0;
 
 	info (6, _("do_get_decryption_key\n"));
 	code = evhttp_request_get_response_code (req);
-	start_destroy_state_request (sr);
-	clear_obtaining_flag (sr->r, OBTAINING_KEY);
+	start_destroy_http_request (hr);
+	clear_obtaining_flag (hr->r, OBTAINING_KEY);
 
 	if (is_valid_http_response_code (code)) {
-		StateRequestResult *res;
+		HTTPRequestResult *res;
 
 		info (2, _("Decryption key obtained\n"));
-		res = create_sr_result (sr, req);
+		res = create_hr_result (hr, req);
 		if (res) {
 			EventNumTypePair *userdata = res->userdata;
 
 			if (userdata) {
 				unsigned int decryption_key;
 
-				parse_sr_result (&decryption_key, res, parse_hex_number);
+				parse_hr_result (&decryption_key, res, parse_hex_number);
 				info (3, _("Got decryption key: %08x\n"), decryption_key);
 				info (3, _("Begin new event #%d (type: %d)\n"),
 				      userdata->no, userdata->type); //TODO: to other place
 
-				write_decryption_key (decryption_key, sr->r, 1); //TODO: check errors
-				continue_pre_handle_stream (sr->r);
+				write_decryption_key (decryption_key, hr->r, 1); //TODO: check errors
+				continue_pre_handle_stream (hr->r);
 				success = 1;
 			}
-			destroy_sr_result (res);
+			destroy_hr_result (res);
 		}
 	} else
 		info (0, "%s: %s: %s %d\n", program_name,
 		      _("key request failed"),
 		      _("HTTP response code"), code);
 	if (! success)
-		sr->r->key_request_failure = 1;
-	start_pending_requests (sr->r, OBTAINING_ALL);
+		hr->r->key_request_failure = 1;
+	start_pending_requests (hr->r, OBTAINING_ALL);
 }
 
 /**
@@ -524,7 +540,7 @@ do_get_decryption_key (struct evhttp_request *req, void *arg)
 void
 start_get_decryption_key (StateReader *r)
 {
-	StateRequest     *sr;
+	HTTPRequest      *hr;
 	EventNumTypePair *userdata;
 	size_t            len;
 	char             *url;
@@ -545,8 +561,8 @@ start_get_decryption_key (StateReader *r)
 	userdata->type = r->new_event_type;
 
 	info (6, _("start_get_decryption_key\n"));
-	sr = create_state_request (r, do_get_decryption_key, r->host, userdata);
-	if (! sr) {
+	hr = create_http_request (r, do_get_decryption_key, r->host, userdata);
+	if (! hr) {
 		free (userdata);
 		return;
 	}
@@ -559,12 +575,12 @@ start_get_decryption_key (StateReader *r)
 		snprintf (url, len,
 		          "%s%u.asp?auth=%s", KEY_URL_BASE, userdata->no, r->cookie);
 
-	r->key_request_failure = (! url) || evhttp_make_request (sr->conn, sr->req,
+	r->key_request_failure = (! url) || evhttp_make_request (hr->conn, hr->req,
 								 EVHTTP_REQ_GET, url);
 	if (r->key_request_failure) {
 		info (0, "%s: %s\n", program_name,
 		      _("key request failed"));
-		destroy_state_request (sr);
+		destroy_http_request (hr);
 	} else {
 		r->obtaining |= OBTAINING_KEY;
 	}
@@ -612,25 +628,25 @@ parse_hex_number (unsigned int *num,
 static void
 do_get_key_frame (struct evhttp_request *req, void *arg)
 {
-	StateRequest *sr = arg;
-	int           code;
+	HTTPRequest *hr = arg;
+	int          code;
 
 	info (6, _("do_get_key_frame\n"));
 	code = evhttp_request_get_response_code (req);
-	start_destroy_state_request (sr);
-	clear_obtaining_flag (sr->r, OBTAINING_FRAME);
+	start_destroy_http_request (hr);
+	clear_obtaining_flag (hr->r, OBTAINING_FRAME);
 
 	if (is_valid_http_response_code (code)) {
-		sr->r->valid_frame = 1;
+		hr->r->valid_frame = 1;
 		info (2, _("Key frame #%u received\n"),
-		      (unsigned int) (sr->userdata ? *((unsigned int *) sr->userdata) : 0));
-		read_stream (sr->r, evhttp_request_get_input_buffer (req), 1);
+		      (unsigned int) (hr->userdata ? *((unsigned int *) hr->userdata) : 0));
+		read_stream (hr->r, evhttp_request_get_input_buffer (req), 1);
 	} else
 		info (0, "%s: %s: %s %d\n", program_name,
 		      _("key frame request failed"),
 		      _("HTTP response code"), code);
 	//TODO: try again on error ?
-	start_pending_requests (sr->r, OBTAINING_ALL);
+	start_pending_requests (hr->r, OBTAINING_ALL);
 }
 
 /**
@@ -643,7 +659,7 @@ do_get_key_frame (struct evhttp_request *req, void *arg)
 void
 start_get_key_frame (StateReader *r)
 {
-	StateRequest *sr;
+	HTTPRequest  *hr;
 	size_t        len;
 	char         *url;
 	unsigned int *userdata;
@@ -656,8 +672,8 @@ start_get_key_frame (StateReader *r)
 		return;
 	*userdata = r->new_frame;
 	info (6, _("start_get_key_frame\n"));
-	sr = create_state_request (r, do_get_key_frame, r->host, userdata);
-	if (! sr) {
+	hr = create_http_request (r, do_get_key_frame, r->host, userdata);
+	if (! hr) {
 		free (userdata);
 		return;
 	}
@@ -677,11 +693,11 @@ start_get_key_frame (StateReader *r)
 	else
 		info (2, _("Obtaining current key frame ...\n"));
 
-	if (! url || evhttp_make_request (sr->conn, sr->req,
+	if (! url || evhttp_make_request (hr->conn, hr->req,
 	                                  EVHTTP_REQ_GET, url)) {
 		info (0, "%s: %s\n", program_name,
 		      _("key frame request failed"));
-		destroy_state_request (sr);
+		destroy_http_request (hr);
 	} else {
 		r->obtaining |= OBTAINING_FRAME;
 		r->stop_handling_reason |= OBTAINING_FRAME;

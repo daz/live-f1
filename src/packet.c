@@ -279,9 +279,18 @@ clear_model (StateModel *m)
 	m->num_cars = 0;
 }
 
-//TODO: description
+/**
+ * push_empty_key_packet:
+ * @r: stream reader structure.
+ *
+ * Pushes empty key packet to cache's tail. @r->key_iter will point to
+ * pushed packet for further key writing.
+ * Doesn't push packet if empty key packet is in cache already.
+ *
+ * Returns: 0 on success, < 0 on failure.
+ **/
 static int
-push_key_packet (StateReader *r)
+push_empty_key_packet (StateReader *r)
 {
 	const Packet *oldp;
 	Packet kp;
@@ -341,7 +350,7 @@ pre_handle_system_packet (StateReader  *r,
 		 */
 		info (4, _("\tgot SYS_EVENT_ID\n"));
 
-		push_key_packet (r);
+		push_empty_key_packet (r);
 
 		number = 0;
 		for (i = 1; i < packet->len; i++) {
@@ -418,7 +427,18 @@ pre_handle_system_packet (StateReader  *r,
 	return 1;
 }
 
-//TODO: description
+/**
+ * read_decryption_key:
+ * @decryption_key: pointer to variable to store decryption key to.
+ * @packet: key packet.
+ *
+ * Reads decryption key from @packet and stores it to @decryption_key
+ * (if @decryption_key is not NULL).
+ *
+ * Returns: 0 on success,
+ * -1 if @packet hasn't decryption key yet,
+ * -2 if @packet is not a key packet.
+ **/
 static int
 read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 {
@@ -443,7 +463,16 @@ read_decryption_key (unsigned int *decryption_key, const Packet *packet)
 	return 0;
 }
 
-//TODO: description
+/**
+ * write_decryption_key:
+ * @decryption_key: decryption key to write,
+ * @r: stream reader structure,
+ * @cipher: cipher code.
+ *
+ * Writes @decryption_key to key packet (@r->key_iter).
+ *
+ * Returns: 0 on success, < 0 on failure.
+ **/
 int
 write_decryption_key (unsigned int decryption_key, StateReader *r, int cipher)
 {
@@ -874,7 +903,7 @@ check_cipher_switch (StateReader *r, const Packet *p, char start)
 	 * of switching to encryption mode.
 	 */
 	r->valid_frame = 0;
-	push_key_packet (r);
+	push_empty_key_packet (r);
 }
 
 /**

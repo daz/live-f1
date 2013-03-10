@@ -388,7 +388,17 @@ save_data (StateReader *r)
 		         strerror (errno));
 }
 
-//TODO: description
+/**
+ * wait_for_decryption_key:
+ * @m: model structure.
+ * @packet: tested packet.
+ *
+ * Checks if @packet is not a key packet or it is filled otherwise.
+ * This function is used to stop packets handling on uninitialised key packet -
+ * such packet must be initialised for further successful decryption.
+ *
+ * Returns: 1 if @packet is not a key packet or is filled, 0 otherwise.
+ **/
 static int
 wait_for_decryption_key (StateModel *m, const Packet *packet)
 {

@@ -34,6 +34,12 @@ when authentication cookie obtaining is in progress, then decryption key
 request becomes pending (see StateReader::pending) and it will be unfreezed
 at do_get_auth_cookie callback (start_pending_requests call).
 
+Regular expressions (regex_t) stores via static pointers and initialises one
+time (on first use). This memory is never released, but this is not a problem -
+there is only limited number of regular expressions in the program. This
+solution is chosen to avoid recompilation (regcomp) of the same regex_t before
+each use.
+
 Cache/replay file format
 ------------------------
 
