@@ -1,3 +1,17 @@
+2013-03-10  Yuriy Mishkov  <ymishkov@gmail.com>
+
+	* Obtaining total laps from http://live-f1.puseyuk.co.uk/laps.php
+	  was replaced by the extraction of them from commentaries.
+
+	* Added source code architecture description.
+
+2012-11-26  Yuriy Mishkov  <ymishkov@gmail.com>
+
+	* Added displaying commentaries.
+
+	* Added key reversing function - formula1.com user credentials are not
+	  required anymore.
+
 2012-11-16  Yuriy Mishkov  <ymishkov@gmail.com>
 
 	* Added save/replay timing functionality and delay feature.
