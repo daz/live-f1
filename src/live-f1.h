@@ -105,6 +105,7 @@ typedef struct {
  * asynchronous getaddrinfo request.
  * @addr: pointer to current element in list headed by @addr_head.
  * @periodic: periodic event.
+ * @signal_term: SIGTERM event.
  * @input_cnum: number of packet cache containing data received from
  * the data server.
  * @encrypted_cnum: number of packet cache containing encrypted data
@@ -146,6 +147,7 @@ typedef struct {
 	struct evdns_getaddrinfo_request *gaireq;
 	struct evutil_addrinfo           *addr_head, *addr;
 	struct event                     *periodic;
+	struct event                     *signal_term;
 	int                               input_cnum;
 	int                               encrypted_cnum;
 	PacketIterator                    key_iter;

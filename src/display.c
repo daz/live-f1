@@ -67,6 +67,9 @@ static void _update_info   ();
 /* Curses display running */
 int cursed = 0;
 
+/* Non-zero in quiet mode (don't show screen) */
+static int quiet_mode = 0;
+
 /* Number of lines being used for the board and status */
 static int nlines = 0;
 
@@ -112,6 +115,19 @@ static size_t commentary_capacity = 0;
 
 /* Last saved timestamp (used for displaying commentary's time) */
 static time_t last_timestamp = 0;
+
+
+/**
+ * set_quiet_mode:
+ *
+ * Sets quiet mode.
+ **/
+void
+set_quiet_mode (void)
+{
+	if (! cursed)
+		quiet_mode = 1;
+}
 
 /**
  * open_display:
@@ -191,11 +207,14 @@ open_display (void)
 static void
 outrefresh_window (WINDOW *win)
 {
-	int vcols = MIN (ncols, COLS - 11);
-	int vlines = MIN (nlines - starty + 1, LINES);
+	int vcols, vlines;
 
 	if (! win)
 		return;
+
+	vcols = MIN (ncols, COLS - 11);
+	vlines = MIN (nlines - starty + 1, LINES);
+
 	if (win == stdscr)
 		wnoutrefresh (win);
 	if (win == boardwin)
@@ -253,6 +272,9 @@ void
 clear_board (StateModel *m)
 {
 	int i;
+
+	if (quiet_mode)
+		return;
 
 	open_display ();
 
@@ -561,6 +583,8 @@ update_cell (StateModel *m,
 	     int         car,
 	     int         type)
 {
+	if (quiet_mode)
+		return;
 	if (! cursed)
 		clear_board (m);
 
@@ -598,6 +622,8 @@ void
 update_car (StateModel *m,
 	    int         car)
 {
+	if (quiet_mode)
+		return;
 	if (! cursed)
 		clear_board (m);
 
@@ -619,6 +645,8 @@ clear_car (StateModel *m,
 {
 	int y;
 
+	if (quiet_mode)
+		return;
 	if (! cursed)
 		clear_board (m);
 
@@ -801,6 +829,8 @@ _update_status (StateModel *m)
 void
 update_status (StateModel *m)
 {
+	if (quiet_mode)
+		return;
 	_update_status (m);
 	outrefresh_window (statwin);
 	outrefresh_window (boardwin);
@@ -853,7 +883,7 @@ _update_time (StateModel *m)
 void
 update_time (StateModel *m)
 {
-	if ((! cursed) || (! statwin))
+	if ((! cursed) || (! statwin) || quiet_mode)
 		return;
 
 	_update_time (m);
@@ -870,7 +900,7 @@ update_time (StateModel *m)
 void
 update_screen (void)
 {
-	if (cursed)
+	if (cursed && (! quiet_mode))
 		doupdate ();
 }
 
@@ -919,7 +949,7 @@ close_display (void)
 int
 handle_keys (StateModel *m)
 {
-	if (! cursed)
+	if ((! cursed) || quiet_mode)
 		return 0;
 
 	int ch = getch ();
@@ -1179,6 +1209,9 @@ info_message (size_t index, const char *message)
 	size_t msglen;
 	static regex_t *re = NULL;
 
+	if (quiet_mode)
+		return;
+
 	if (! re) {
 		re = malloc (sizeof (*re));
 		if (! re)
@@ -1263,7 +1296,7 @@ display_commentary (void)
 	/* clear commentary buffer */
 	commentary_size = 0;
 
-	if ((! cursed) || (displayed_info_index != info_ring_count))
+	if ((! cursed) || quiet_mode || (displayed_info_index != info_ring_count))
 		return;
 
 	_update_info ();

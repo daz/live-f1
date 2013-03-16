@@ -38,7 +38,7 @@ if key frame request is not in progress, or wait otherwise).
 
 Delay implementation uses variables StateModel::replay_gap,
 StateModel::time_gap, StateModel::model_time.
-First one is difference between race time and real-world time (replay_gap is 0
+First one is difference between race time and replay time (replay_gap is 0
 in live mode).
 Second one is delay itself - wanted gap between packet "pure" visualization
 time (as if there were no delay; it is equal to real packet receiving time in
@@ -46,7 +46,7 @@ live mode) and real-world time.
 StateModel::model_time is virtual time (program visualizes race state at
 this time moment); this one tends to the value
 <real_world_time> - (time_gap + replay_gap)
-but may not be equal to it (see update_model_time).
+but it may differ (see update_model_time).
 Delay implementation cannot rewind visualization (model_time cannot decrease)
 in the current version.
 

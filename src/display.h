@@ -31,6 +31,8 @@ SJR_BEGIN_EXTERN
 int cursed;
 
 
+void set_quiet_mode (void);
+
 void update_screen (void);
 void close_display (void);
 int  handle_keys   (StateModel *m);

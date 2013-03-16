@@ -40,6 +40,7 @@
 #include <locale.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 
 #include <event2/dns.h>
 #include <event2/event.h>
@@ -68,7 +69,7 @@ static int verbosity = 0;
 static int debug_mode = 0;
 
 /* Command-line options */
-static const char opts[] = "df:rv";
+static const char opts[] = "df:qrv";
 static const struct option longopts[] = {
 	{ "verbose",	no_argument,       NULL, 'v' },
 	{ "help",	no_argument,       NULL, 0400 + 'h' },
@@ -76,6 +77,7 @@ static const struct option longopts[] = {
 	{ "debug",      no_argument,       NULL, 'd' },
 	{ "file",       required_argument, NULL, 'f' },
 	{ "replay",     no_argument,       NULL, 'r' },
+	{ "quiet",      no_argument,       NULL, 'q' },
 	{ NULL,		no_argument,       NULL, 0 }
 };
 
@@ -91,6 +93,10 @@ reader_destroy (StateReader *r)
 {
 	destroy_packet_cache (r->encrypted_cnum);
 	destroy_packet_cache (r->input_cnum);
+	if (r->signal_term) {
+		event_free (r->signal_term);
+		r->signal_term = NULL;
+	}
 	if (r->periodic) {
 		event_free (r->periodic);
 		r->periodic = NULL;
@@ -483,6 +489,36 @@ start_periodic (CurrentState *state)
 }
 
 /**
+ * do_signal_term:
+ * @arg: application state structure.
+ *
+ * SIGTERM callback.
+ * Calls start_loopexit.
+ **/
+static void
+do_signal_term (evutil_socket_t sock, short what, void *arg)
+{
+	CurrentState *state = arg;
+
+	info (6, _("do_signal_term\n"));
+	start_loopexit (state->r.base);
+}
+
+/**
+ * start_signal_term:
+ * @state: application state structure.
+ *
+ * Sets the signal event callback.
+ **/
+static void
+start_signal_term (CurrentState *state)
+{
+	info (6, _("start_signal_term\n"));
+	state->r.signal_term = evsignal_new (state->r.base, SIGTERM, do_signal_term, state);
+	event_add (state->r.signal_term, NULL);
+}
+
+/**
  * initiate_reading_process:
  * @r: stream reader structure.
  * @m: model structure.
@@ -545,6 +581,9 @@ main (int   argc,
 		case 'r':
 			replay_mode = 1;
 			break;
+		case 'q':
+			set_quiet_mode ();
+			break;
 		case '?':
 			fprintf (stderr,
 				 _("Try `%s --help' for more information.\n"),
@@ -592,6 +631,7 @@ main (int   argc,
 	if (currentstate_configurate (&state, home_dir, save_file) == 0) {
 		initiate_reading_process (&state.r, &state.m);
 		start_periodic (&state);
+		start_signal_term (&state);
 		event_base_dispatch (state.r.base);
 	} else
 		res = 1;
@@ -705,7 +745,11 @@ print_usage (void)
 		  "  -f, --file <file>          use <file> for packet streaming\n"
 		  "                             (default is ~/.f1data).\n"
 		  "  -r, --replay               replay stream from file instead of\n"
-		  "                             getting it from live timing servers.\n"));
+		  "                             getting it from live timing servers.\n"
+		  "  -q, --quiet                quiet mode (don't show screen; e.g.,\n"
+		  "                             program can be invoked as cron job;\n"
+		  "                             send SIGTERM to terminate it).\n"
+		 ));
 	printf ("\n");
 	printf (_("Keys (case insensitive):\n"
 		  "  'i'                        increment time gap by 1 second.\n"
