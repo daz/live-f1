@@ -146,7 +146,7 @@ act_reverser (KeyReverser *krev, const Packet *p)
 {
 	static const char *start_phrase = "Please Wait ...";
 	static regex_t    *re = NULL;
-	size_t             count = 0;
+	size_t             count = 0, i = 0;
 
 	assert (krev);
 	assert (p);
@@ -166,14 +166,10 @@ act_reverser (KeyReverser *krev, const Packet *p)
 		}
 		if (p->car || (p->type != SYS_NOTICE))
 			krev->status = KR_STATUS_FAILURE;
-		else if (count != strlen (start_phrase)) {
-			if (regexec(re, (const char *) p->payload, 0, NULL, 0) == 0)
-				krev->status = KR_STATUS_PLAINTEXT;
-			else
-				krev->status = KR_STATUS_FAILURE;
+		else if (regexec(re, (const char *) p->payload, 0, NULL, 0) == 0) {
+			krev->status = KR_STATUS_PLAINTEXT;
+		//TODO: there is a little probability that encrypted text starts with "^img:"
 		} else {
-			size_t i = 0;
-
 			if (krev->salt & 0x01) {
 				first_character (krev, p->payload[i] ^ start_phrase[i]);
 				++i;
@@ -181,18 +177,21 @@ act_reverser (KeyReverser *krev, const Packet *p)
 			} else
 				//TODO: implement this variant ?
 				krev->status = KR_STATUS_FAILURE;
+			/* Commented out - skip strict checking for
+			 * all characters except the first one. */
+			/*
 			for ( ; (i < count) && (krev->status == KR_STATUS_START); ++i, ++krev->pos)
 				next_character (krev, p->payload[i] ^ start_phrase[i], 1);
+			*/
 			if (krev->status == KR_STATUS_START)
 				krev->status = KR_STATUS_IN_PROGRESS;
 			else if ((krev->status == KR_STATUS_FAILURE) &&
 			         (regexec(re, (const char *) p->payload, 0, NULL, 0) == 0))
 				krev->status = KR_STATUS_PLAINTEXT;
 		}
-	} else if (krev->status == KR_STATUS_IN_PROGRESS) {
-		size_t i = 0;
-
-		if ((! p->car) && ((p->type == SYS_COMMENTARY) || (p->type == SYS_NOTICE)))
+	}
+	if (krev->status == KR_STATUS_IN_PROGRESS) {
+		if ((! p->car) && (p->type == SYS_COMMENTARY))
 			krev->status = KR_STATUS_FAILURE;
 		for ( ; (i < count) && (krev->status == KR_STATUS_IN_PROGRESS); ++i, ++krev->pos)
 			next_character (krev, p->payload[i], 0);
