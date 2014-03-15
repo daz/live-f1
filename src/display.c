@@ -26,7 +26,13 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <curses.h>
+
+#ifdef __CYGWIN__
+# include <ncurses/curses.h>
+#else
+# include <curses.h>
+#endif
+
 #include <time.h>
 #include <regex.h>
 
