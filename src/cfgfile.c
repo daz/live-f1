@@ -33,7 +33,11 @@
 #include <string.h>
 #include <errno.h>
 
-#include <curses.h>
+#ifdef __CYGWIN__
+# include <ncurses/curses.h>
+#else
+# include <curses.h>
+#endif
 
 #include <fcntl.h>
 #include <termios.h>
